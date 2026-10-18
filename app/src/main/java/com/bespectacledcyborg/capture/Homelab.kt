@@ -1,17 +1,16 @@
 package com.bespectacledcyborg.capture
 
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.Base64
 
 object Homelab {
     const val ORCHESTRATOR = "https://agents.example.invalid"
-    const val CAPTURES = "https://dufs.example.invalid/captures/"
     const val CONCIERGE = "concierge"
 
     fun isReachable(): Boolean = runCatching {
@@ -24,35 +23,42 @@ object Homelab {
         }
     }.getOrDefault(false)
 
-    fun upload(file: File, name: String): String {
-        val url = CAPTURES + name
-        val connection = open(url, "PUT", timeoutMillis = 60_000)
+    fun post(line: String, file: File?) {
+        val connection = open("$ORCHESTRATOR/api/sessions/$CONCIERGE/input", "POST", timeoutMillis = 120_000)
         try {
             connection.doOutput = true
-            connection.setFixedLengthStreamingMode(file.length())
-            connection.setRequestProperty("Content-Type", if (name.endsWith(".mp4")) "video/mp4" else "image/jpeg")
-            connection.outputStream.use { out -> file.inputStream().use { it.copyTo(out) } }
-            expectSuccess(connection, "upload")
+            connection.setChunkedStreamingMode(64 * 1024)
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.outputStream.buffered().use { writeInput(it, line, file) }
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                val detail = connection.errorStream?.bufferedReader()?.use { it.readText().take(200) }.orEmpty()
+                throw IOException(failure(code, detail))
+            }
         } finally {
             connection.disconnect()
         }
-        return url
     }
 
-    fun post(line: String) {
-        val body = Json.encodeToString(JsonObject.serializer(), buildJsonObject { put("text", JsonPrimitive(line)) })
-            .toByteArray()
-        val connection = open("$ORCHESTRATOR/api/sessions/$CONCIERGE/input", "POST", timeoutMillis = 15_000)
-        try {
-            connection.doOutput = true
-            connection.setFixedLengthStreamingMode(body.size)
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.outputStream.use { it.write(body) }
-            expectSuccess(connection, "post")
-        } finally {
-            connection.disconnect()
+    fun writeInput(out: OutputStream, line: String, file: File?) {
+        out.write("{\"text\":${quote(line)}".toByteArray())
+        if (file != null) {
+            out.write(",\"file\":{\"name\":${quote(file.name)},\"data\":\"".toByteArray())
+            val encoder = Base64.getEncoder().wrap(NonClosing(out))
+            file.inputStream().use { it.copyTo(encoder) }
+            encoder.close()
+            out.write("\"}".toByteArray())
         }
+        out.write("}".toByteArray())
     }
+
+    private fun failure(code: Int, detail: String): String = when (code) {
+        429 -> "The concierge's queue is full. Retry in a bit."
+        413 -> "The file is over the 50 MB limit."
+        else -> "Send failed: HTTP $code $detail".trim()
+    }
+
+    private fun quote(value: String): String = Json.encodeToString(String.serializer(), value)
 
     private fun open(url: String, method: String, timeoutMillis: Int): HttpURLConnection =
         (URI(url).toURL().openConnection() as HttpURLConnection).apply {
@@ -61,11 +67,9 @@ object Homelab {
             readTimeout = timeoutMillis
         }
 
-    private fun expectSuccess(connection: HttpURLConnection, step: String) {
-        val code = connection.responseCode
-        if (code !in 200..299) {
-            val detail = connection.errorStream?.bufferedReader()?.use { it.readText().take(200) }.orEmpty()
-            throw IOException("$step failed: HTTP $code $detail".trim())
-        }
+    private class NonClosing(private val out: OutputStream) : OutputStream() {
+        override fun write(b: Int) = out.write(b)
+        override fun write(b: ByteArray, off: Int, len: Int) = out.write(b, off, len)
+        override fun close() = Unit
     }
 }

@@ -15,23 +15,20 @@ class Dictation(
 ) {
     private var recognizer: SpeechRecognizer? = null
 
+    private var language: String? = LANGUAGE
+
     fun start() {
         stop()
-        val created = if (SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        } else {
-            SpeechRecognizer.createSpeechRecognizer(context)
-        }
+        val created = SpeechRecognizer.createSpeechRecognizer(context)
         recognizer = created
         created.setRecognitionListener(listener)
-        created.startListening(
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_000L),
-        )
-        onStatus("Listening…")
+        val request = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_000L)
+        language?.let { request.putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
+        created.startListening(request)
+        onStatus(if (language == null) "Listening…" else "Listening ($language)…")
     }
 
     fun stop() {
@@ -57,6 +54,11 @@ class Dictation(
 
         override fun onError(error: Int) {
             stop()
+            if (language != null && error in UNSUPPORTED_LANGUAGE) {
+                language = null
+                start()
+                return
+            }
             onStatus(
                 when (error) {
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
@@ -77,4 +79,12 @@ class Dictation(
 
     private fun best(results: Bundle?): String? =
         results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+
+    private companion object {
+        const val LANGUAGE = "en-SG"
+        val UNSUPPORTED_LANGUAGE = setOf(
+            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+            SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+        )
+    }
 }

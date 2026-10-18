@@ -7,13 +7,14 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.GradientDrawable
+import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -42,6 +43,9 @@ class CaptureActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setLayout(WRAP_CONTENT, WRAP_CONTENT)
+        window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { cancel() }
         scope.launch { run(intent) }
     }
@@ -90,7 +94,11 @@ class CaptureActivity : Activity() {
         }
         recordingCapture = PendingCapture.start(CaptureKind.RECORD, foregroundApp())
         ensurePermissions()
-        startActivityForResult(getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent(), REQUEST_PROJECTION)
+        startActivityForResult(
+            getSystemService(MediaProjectionManager::class.java)
+                .createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()),
+            REQUEST_PROJECTION,
+        )
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -113,6 +121,7 @@ class CaptureActivity : Activity() {
     private suspend fun dictate(pending: PendingCapture) {
         capture = pending
         ensurePermissions()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         setContentView(panel(pending))
         dictation = Dictation(
             this,
@@ -198,11 +207,8 @@ class CaptureActivity : Activity() {
             })
         })
         return FrameLayout(this).apply {
-            addView(card, FrameLayout.LayoutParams(minOf(dp(560), resources.displayMetrics.widthPixels - dp(32)), WRAP_CONTENT).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = dp(48)
-            })
-            layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+            setPadding(dp(16), dp(16), dp(16), dp(48))
+            addView(card, FrameLayout.LayoutParams(minOf(dp(560), resources.displayMetrics.widthPixels - dp(32)), WRAP_CONTENT))
         }
     }
 

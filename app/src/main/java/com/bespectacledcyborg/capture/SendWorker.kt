@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val store = CaptureStore(applicationContext)
+        store.pruneAbandoned()
         val queue = store.ready()
         if (queue.isEmpty()) return@withContext Result.success()
         if (!Homelab.isReachable()) {
@@ -34,14 +35,8 @@ class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     private fun send(store: CaptureStore, capture: PendingCapture) {
-        val media = store.mediaFile(capture)
-        val uploaded = if (media != null && capture.uploadedUrl == null) {
-            capture.copy(uploadedUrl = Homelab.upload(media, media.name)).also(store::save)
-        } else {
-            capture
-        }
-        Homelab.post(uploaded.payload().toLine())
-        store.delete(uploaded)
+        Homelab.post(capture.payload().toLine(), store.mediaFile(capture))
+        store.delete(capture)
     }
 
     companion object {

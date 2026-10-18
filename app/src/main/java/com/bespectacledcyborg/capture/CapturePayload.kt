@@ -12,7 +12,6 @@ data class CapturePayload(
     val app: String,
     @SerialName("package") val packageName: String,
     val url: String?,
-    val file: String?,
     val said: String,
     val at: String,
 ) {

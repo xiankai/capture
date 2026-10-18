@@ -27,6 +27,7 @@ class RecordService : Service() {
     private var projection: MediaProjection? = null
     private var display: VirtualDisplay? = null
     private var capture: PendingCapture? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -77,13 +78,7 @@ class RecordService : Service() {
             setVideoSize(spec.width, spec.height)
             setVideoFrameRate(spec.frameRate)
             setVideoEncodingBitRate(spec.bitRate)
-            setMaxDuration(MAX_DURATION_MILLIS)
             setOutputFile(output)
-            setOnInfoListener { _, what, _ ->
-                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
-                    finish()?.let { Notifications.clipReady(this@RecordService, it) }
-                }
-            }
             prepare()
         }
         recorder = mediaRecorder
@@ -94,11 +89,9 @@ class RecordService : Service() {
         projection = mediaProjection
         mediaProjection.registerCallback(
             object : MediaProjection.Callback() {
-                override fun onStop() {
-                    finish()?.let { Notifications.clipReady(this@RecordService, it) }
-                }
+                override fun onStop() = finishInBackground()
             },
-            Handler(Looper.getMainLooper()),
+            handler,
         )
         display = mediaProjection.createVirtualDisplay(
             "capture",
@@ -111,13 +104,19 @@ class RecordService : Service() {
             null,
         )
         mediaRecorder.start()
+        handler.postDelayed(::finishInBackground, MAX_DURATION_MILLIS)
         current = this
         refreshTile(this)
+    }
+
+    private fun finishInBackground() {
+        finish()?.let { Notifications.clipReady(this, it) }
     }
 
     fun finish(): String? {
         val finished = capture ?: return null
         capture = null
+        handler.removeCallbacksAndMessages(null)
         val saved = runCatching { recorder?.stop() }.isSuccess
         release()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -150,6 +149,7 @@ class RecordService : Service() {
         companion object {
             private const val MAX_EDGE = 1920
             private const val BITS_PER_PIXEL_FRAME = 0.06
+            const val MAX_BIT_RATE = 8_000_000
 
             fun forDisplay(display: Display): VideoSpec {
                 val mode = display.mode
@@ -163,7 +163,7 @@ class RecordService : Service() {
                 val w = even(width * scale)
                 val h = even(height * scale)
                 val rate = listOf(refreshRate, 60, 30).distinct().firstOrNull { supported(w, h, it) } ?: 30
-                val bitRate = (w * h * rate * BITS_PER_PIXEL_FRAME).roundToInt().coerceIn(4_000_000, 20_000_000)
+                val bitRate = (w * h * rate * BITS_PER_PIXEL_FRAME).roundToInt().coerceIn(4_000_000, MAX_BIT_RATE)
                 return VideoSpec(w, h, rate, bitRate)
             }
 
@@ -183,7 +183,7 @@ class RecordService : Service() {
         private const val EXTRA_RESULT_CODE = "resultCode"
         private const val EXTRA_CONSENT = "consent"
         private const val EXTRA_CAPTURE = "capture"
-        const val MAX_DURATION_MILLIS = 30_000
+        const val MAX_DURATION_MILLIS = 30_000L
 
         @Volatile
         var current: RecordService? = null

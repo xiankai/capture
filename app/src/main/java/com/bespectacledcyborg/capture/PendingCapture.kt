@@ -17,9 +17,8 @@ data class PendingCapture(
     val fileName: String?,
     val said: String = "",
     val ready: Boolean = false,
-    val uploadedUrl: String? = null,
 ) {
-    fun payload(): CapturePayload = CapturePayload(kind, app, packageName, url, uploadedUrl, said, at)
+    fun payload(): CapturePayload = CapturePayload(kind, app, packageName, url, said, at)
 
     companion object {
         fun start(kind: CaptureKind, context: AppContext, time: OffsetDateTime = OffsetDateTime.now()): PendingCapture {
@@ -65,6 +64,13 @@ class CaptureStore(context: Context) {
             .filter { it.ready }
             .sortedBy { it.id }
 
+    fun pruneAbandoned(now: Long = System.currentTimeMillis()) {
+        dir.listFiles { f -> f.name.endsWith(".json") }.orEmpty()
+            .mapNotNull { decode(it) }
+            .filter { !it.ready && now - (it.id.toLongOrNull() ?: now) > ABANDONED_AFTER_MILLIS }
+            .forEach(::delete)
+    }
+
     fun delete(capture: PendingCapture) {
         mediaFile(capture)?.delete()
         File(dir, "${capture.id}.json").delete()
@@ -72,4 +78,8 @@ class CaptureStore(context: Context) {
 
     private fun decode(file: File): PendingCapture? =
         runCatching { json.decodeFromString(PendingCapture.serializer(), file.readText()) }.getOrNull()
+
+    private companion object {
+        const val ABANDONED_AFTER_MILLIS = 24 * 60 * 60 * 1000L
+    }
 }

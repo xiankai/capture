@@ -249,7 +249,11 @@ class CaptureActivity : Activity() {
                 .putExtra(EXTRA_CAPTURE_ID, captureId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        private fun kindOf(intent: Intent): CaptureKind? =
-            CaptureKind.entries.firstOrNull { intent.action == ACTION_PREFIX + it.name }
+        private fun kindOf(intent: Intent): CaptureKind? = CaptureKind.entries.firstOrNull {
+            intent.action == ACTION_PREFIX + it.name || intent.component?.className == launcherAlias(it)
+        }
+
+        private fun launcherAlias(kind: CaptureKind): String =
+            "com.bespectacledcyborg.capture.${kind.name.lowercase().replaceFirstChar(Char::uppercase)}Launcher"
     }
 }

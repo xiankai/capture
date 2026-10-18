@@ -1,0 +1,77 @@
+name: build
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: android
+    container:
+      image: android-ci:latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        run: |
+          set -euo pipefail
+          test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
+          git config --global http.extraHeader "Authorization: token ${RUN_TOKEN}"
+          git clone --quiet --no-tags --filter=blob:none \
+            "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo
+          if [ -n "${PR_NUMBER}" ]; then
+            git -C /tmp/repo fetch --quiet origin "refs/pull/${PR_NUMBER}/head:refs/heads/pr-head"
+            git -C /tmp/repo -c advice.detachedHead=false checkout --quiet pr-head
+          else
+            git -C /tmp/repo -c advice.detachedHead=false checkout --quiet "${GITHUB_SHA}"
+          fi
+          git config --global --unset-all http.extraHeader
+        env:
+          RUN_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Gradle cache key
+        id: key
+        run: |
+          set -euo pipefail
+          cd /tmp/repo
+          files=$(git ls-files 'gradle/libs.versions.toml' 'gradle/wrapper/gradle-wrapper.properties' '*.gradle.kts')
+          [ -n "$files" ] || { echo "::error::no Gradle files matched for the cache key"; exit 1; }
+          h=$(printf '%s\n' "$files" | xargs -d '\n' sha256sum | sha256sum | cut -c1-16)
+          echo "key=gradle-build-${h}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Gradle cache
+        uses: https://data.forgejo.org/actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.key.outputs.key }}
+          restore-keys: |
+            gradle-build-
+
+      - name: Unit tests and lint
+        run: |
+          set -euo pipefail
+          cd /tmp/repo
+          ./gradlew --no-daemon --continue testDebugUnitTest lintDebug
+        env:
+          ANDROID_HOME: /opt/android-sdk
+          GRADLE_OPTS: -Dorg.gradle.configuration-cache=false
+
+      - name: Tidy the Gradle cache before it is saved
+        if: success()
+        run: |
+          rm -f ~/.gradle/caches/modules-2/modules-2.lock ~/.gradle/caches/modules-2/gc.properties
+          find ~/.gradle/caches -name '*.lock' -type f -delete 2>/dev/null || true
+
+      - name: Lint report on failure
+        if: failure()
+        run: |
+          report=/tmp/repo/app/build/reports/lint-results-debug.txt
+          [ -f "$report" ] && tail -100 "$report" || echo "no lint report produced"

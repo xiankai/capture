@@ -27,11 +27,6 @@ android {
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
     }
 
-    buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-        }
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

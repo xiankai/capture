@@ -22,19 +22,14 @@ class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             Notifications.unreachable(applicationContext)
             return@withContext Result.success()
         }
-        for (capture in queue) {
-            try {
-                send(store, capture)
-            } catch (e: Exception) {
-                Notifications.failed(applicationContext, e.message ?: e.javaClass.simpleName)
-                return@withContext Result.success()
-            }
-        }
-        Notifications.sent(applicationContext, queue.size)
+        val failures = queue.mapNotNull { capture -> send(store, capture).exceptionOrNull() }
+        val sent = queue.size - failures.size
+        if (sent > 0) Notifications.sent(applicationContext, sent)
+        failures.firstOrNull()?.let { Notifications.failed(applicationContext, it.message ?: it.javaClass.simpleName) }
         Result.success()
     }
 
-    private fun send(store: CaptureStore, capture: PendingCapture) {
+    private fun send(store: CaptureStore, capture: PendingCapture): kotlin.Result<Unit> = runCatching {
         Homelab.post(capture.payload().toLine(), store.mediaFile(capture))
         store.delete(capture)
     }

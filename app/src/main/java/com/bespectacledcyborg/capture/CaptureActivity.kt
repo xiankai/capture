@@ -80,7 +80,7 @@ class CaptureActivity : Activity() {
             return
         }
         withContext(Dispatchers.IO) {
-            requireNotNull(store.mediaFile(pending)).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            requireNotNull(store.mediaFile(pending)).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) } // stack-reviewer-ignore: a REPORT capture always has a jpg fileName, so mediaFile is non-null here
             bitmap.recycle()
         }
         dictate(started(pending))
@@ -94,7 +94,7 @@ class CaptureActivity : Activity() {
             return
         }
         recordingCapture = PendingCapture.start(CaptureKind.RECORD, foregroundApp())
-        ensurePermissions()
+        if (!ensurePermissions()) return
         startActivityForResult(
             getSystemService(MediaProjectionManager::class.java)
                 .createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()),
@@ -121,7 +121,7 @@ class CaptureActivity : Activity() {
 
     private suspend fun dictate(pending: PendingCapture) {
         capture = pending
-        ensurePermissions()
+        if (!ensurePermissions()) return
         window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         setContentView(panel(pending))
         dictation = Dictation(
@@ -147,22 +147,17 @@ class CaptureActivity : Activity() {
         finish()
     }
 
-    private suspend fun ensurePermissions() {
+    private suspend fun ensurePermissions(): Boolean {
         val missing = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
             .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isEmpty()) return
+        if (missing.isEmpty()) return true
         val answered = CompletableDeferred<Unit>()
         permissionsAnswered = answered
         requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-        // The dialog can stop existing without answering -- the activity is recreated
-        // under it, the user goes home, the system kills the process. Waiting forever
-        // leaves a capture screen that never draws its panel, so give up instead and
-        // let the missing permission surface as a failed send with a message.
-        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } == null) {
-            Toast.makeText(this, "Waiting for permissions -- capture cancelled", Toast.LENGTH_LONG).show()
-            finish()
-            return
-        }
+        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } != null) return true
+        Toast.makeText(this, "Waiting for permissions -- capture cancelled", Toast.LENGTH_LONG).show()
+        finish()
+        return false
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -232,7 +227,7 @@ class CaptureActivity : Activity() {
     override fun onDestroy() {
         dictation?.stop()
         scope.cancel()
-        if (isFinishing && !decided) capture?.let(store::delete)
+        if (isFinishing && !decided) capture?.let(store::delete) // stack-reviewer-ignore: a process killed before onDestroy leaves the capture unready, and SendWorker's pruneAbandoned removes it
         super.onDestroy()
     }
 

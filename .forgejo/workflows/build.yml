@@ -25,6 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
+          # The token is unset on the way out whatever happens: a failed clone used
+          # to leave it in the global git config for every later step in the job.
+          trap 'git config --global --unset-all http.extraHeader || true' EXIT
           git config --global http.extraHeader "Authorization: token ${RUN_TOKEN}"
           git clone --quiet --no-tags --filter=blob:none \
             "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo

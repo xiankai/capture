@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Capture</string>
+    <string name="accessibility_label">Capture</string>
+    <string name="accessibility_description">Lets the Report tile screenshot the app you are using and tells each capture which app and web address it came from. Nothing is read until you tap a capture tile.</string>
+    <string name="idea">Idea</string>
+    <string name="report">Report</string>
+    <string name="record">Record</string>
 </resources>

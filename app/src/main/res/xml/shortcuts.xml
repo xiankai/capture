@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_idea"
+        android:shortcutId="idea"
+        android:shortcutShortLabel="@string/idea">
+        <intent
+            android:action="com.bespectacledcyborg.capture.action.IDEA"
+            android:targetClass="com.bespectacledcyborg.capture.CaptureActivity"
+            android:targetPackage="com.bespectacledcyborg.capture" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_report"
+        android:shortcutId="report"
+        android:shortcutShortLabel="@string/report">
+        <intent
+            android:action="com.bespectacledcyborg.capture.action.REPORT"
+            android:targetClass="com.bespectacledcyborg.capture.CaptureActivity"
+            android:targetPackage="com.bespectacledcyborg.capture" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_record"
+        android:shortcutId="record"
+        android:shortcutShortLabel="@string/record">
+        <intent
+            android:action="com.bespectacledcyborg.capture.action.RECORD"
+            android:targetClass="com.bespectacledcyborg.capture.CaptureActivity"
+            android:targetPackage="com.bespectacledcyborg.capture" />
+    </shortcut>
+</shortcuts>

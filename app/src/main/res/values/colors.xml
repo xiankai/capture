@@ -1,0 +1,6 @@
+<resources>
+    <color name="capture">#FF37474F</color>
+    <color name="idea">#FFF9A825</color>
+    <color name="report">#FFD84315</color>
+    <color name="record">#FF1565C0</color>
+</resources>

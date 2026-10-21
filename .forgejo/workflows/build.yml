@@ -21,8 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
-          trap 'git config --global --unset-all http.extraHeader || true' EXIT
-          git config --global http.extraHeader "Authorization: token ${RUN_TOKEN}"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: token ${RUN_TOKEN}"
           git clone --quiet --no-tags --filter=blob:none \
             "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo
           if [ -n "${PR_NUMBER}" ]; then
@@ -31,7 +30,6 @@ jobs:
           else
             git -C /tmp/repo -c advice.detachedHead=false checkout --quiet "${GITHUB_SHA}"
           fi
-          git config --global --unset-all http.extraHeader
         env:
           RUN_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class CaptureActivity : Activity() {
     private val scope = MainScope()
@@ -153,7 +154,15 @@ class CaptureActivity : Activity() {
         val answered = CompletableDeferred<Unit>()
         permissionsAnswered = answered
         requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-        answered.await()
+        // The dialog can stop existing without answering -- the activity is recreated
+        // under it, the user goes home, the system kills the process. Waiting forever
+        // leaves a capture screen that never draws its panel, so give up instead and
+        // let the missing permission surface as a failed send with a message.
+        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } == null) {
+            Toast.makeText(this, "Waiting for permissions -- capture cancelled", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -237,6 +246,7 @@ class CaptureActivity : Activity() {
         private const val REQUEST_PERMISSIONS = 1
         private const val REQUEST_PROJECTION = 2
         private const val SHADE_SETTLE_MILLIS = 600L
+        private const val PERMISSION_TIMEOUT_MILLIS = 60_000L
 
         fun launchIntent(context: Context, kind: CaptureKind): Intent =
             Intent(context, CaptureActivity::class.java)

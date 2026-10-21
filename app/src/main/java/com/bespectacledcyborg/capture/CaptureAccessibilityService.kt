@@ -42,7 +42,10 @@ class CaptureAccessibilityService : AccessibilityService() {
                     val bitmap = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)
                         ?.copy(Bitmap.Config.ARGB_8888, false)
                     buffer.close()
-                    continuation.resume(bitmap)
+                    // If the coroutine was cancelled while the system was taking the
+                    // shot (the activity finished), nothing will ever read the bitmap,
+                    // so free it here rather than waiting on a collector that is gone.
+                    if (continuation.isActive) continuation.resume(bitmap) else bitmap?.recycle()
                 }
 
                 override fun onFailure(errorCode: Int) {

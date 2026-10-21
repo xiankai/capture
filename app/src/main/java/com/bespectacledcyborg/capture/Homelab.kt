@@ -13,6 +13,9 @@ object Homelab {
     const val ORCHESTRATOR = "https://agents.example.invalid"
     const val CONCIERGE = "concierge"
 
+    /** The orchestrator's input cap (50 MB), so a clip is refused before it is sent. */
+    private const val MAX_UPLOAD_BYTES = 50L * 1024 * 1024
+
     fun isReachable(): Boolean = runCatching {
         open("$ORCHESTRATOR/api/health", "GET", timeoutMillis = 4_000).run {
             try {
@@ -24,6 +27,10 @@ object Homelab {
     }.getOrDefault(false)
 
     fun post(line: String, file: File?) {
+        // Checked before opening the request: with a chunked body there is no
+        // Content-Length for the server to refuse on, so an oversized clip would be
+        // uploaded in full and then rejected.
+        if (file != null && file.length() > MAX_UPLOAD_BYTES) throw IOException(failure(413, ""))
         val connection = open("$ORCHESTRATOR/api/sessions/$CONCIERGE/input", "POST", timeoutMillis = 120_000)
         try {
             connection.doOutput = true

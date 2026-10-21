@@ -12,7 +12,11 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: android
+    # `ubuntu-latest`, not `android`: the android-labelled runner is registered to the
+    # xiankai-github org, so a job in this org waited forever and every run so far ended
+    # cancelled without starting. The clockwork-princess runner can run the same job --
+    # it is on the same host, so `android-ci:latest` is the local image, not a pull.
+    runs-on: ubuntu-latest
     container:
       image: android-ci:latest
     timeout-minutes: 30

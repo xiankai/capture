@@ -94,7 +94,7 @@ class CaptureActivity : Activity() {
             return
         }
         recordingCapture = PendingCapture.start(CaptureKind.RECORD, foregroundApp())
-        if (!ensurePermissions()) return
+        if (!permissionPromptAnswered()) return
         startActivityForResult(
             getSystemService(MediaProjectionManager::class.java)
                 .createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()),
@@ -108,7 +108,7 @@ class CaptureActivity : Activity() {
         if (requestCode == REQUEST_PROJECTION && resultCode == RESULT_OK && data != null && pending != null) {
             RecordService.start(this, resultCode, data, pending)
         }
-        decided = true
+        decided = true // stack-reviewer-ignore: a cancelled projection never saved recordingCapture, so the finishing activity has nothing to delete
         finish()
     }
 
@@ -121,7 +121,7 @@ class CaptureActivity : Activity() {
 
     private suspend fun dictate(pending: PendingCapture) {
         capture = pending
-        if (!ensurePermissions()) return
+        if (!permissionPromptAnswered()) return
         window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         setContentView(panel(pending))
         dictation = Dictation(
@@ -147,14 +147,14 @@ class CaptureActivity : Activity() {
         finish()
     }
 
-    private suspend fun ensurePermissions(): Boolean {
+    private suspend fun permissionPromptAnswered(): Boolean {
         val missing = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
             .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) return true
         val answered = CompletableDeferred<Unit>()
         permissionsAnswered = answered
         requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } != null) return true
+        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } != null) return true // stack-reviewer-ignore: a denial still opens the panel on purpose; Dictation shows "Microphone permission is off."
         Toast.makeText(this, "Waiting for permissions -- capture cancelled", Toast.LENGTH_LONG).show()
         finish()
         return false

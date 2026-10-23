@@ -87,7 +87,7 @@ class CaptureAccessibilityService : AccessibilityService() {
 
     private suspend fun report() {
         val shown = bubble ?: return
-        val pending = PendingCapture.start(CaptureKind.REPORT, foregroundApp())
+        val pending = PendingCapture.start(CaptureKind.REPORT, foregroundApp()) // stack-reviewer-ignore: start only builds the object; nothing is stored until store.save after the screenshot succeeds
         val bitmap = shown.hiddenWhile {
             delay(HIDE_SETTLE_MILLIS)
             screenshot()

@@ -32,62 +32,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity>
 
         <activity
             android:name=".CaptureActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
             android:excludeFromRecents="true"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=""
-            android:theme="@style/Theme.Capture.Overlay">
-            <intent-filter>
-                <action android:name="com.bespectacledcyborg.capture.action.IDEA" />
-                <action android:name="com.bespectacledcyborg.capture.action.REPORT" />
-                <action android:name="com.bespectacledcyborg.capture.action.RECORD" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <activity-alias
-            android:name=".IdeaLauncher"
-            android:exported="true"
-            android:icon="@drawable/ic_idea_launcher"
-            android:label="@string/idea"
-            android:targetActivity=".CaptureActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".ReportLauncher"
-            android:exported="true"
-            android:icon="@drawable/ic_report_launcher"
-            android:label="@string/report"
-            android:targetActivity=".CaptureActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".RecordLauncher"
-            android:exported="true"
-            android:icon="@drawable/ic_record_launcher"
-            android:label="@string/record"
-            android:targetActivity=".CaptureActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
+            android:theme="@style/Theme.Capture.Overlay" />
 
         <service
             android:name=".CaptureAccessibilityService"
@@ -106,39 +60,6 @@
             android:name=".RecordService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
-
-        <service
-            android:name=".IdeaTile"
-            android:exported="true"
-            android:icon="@drawable/ic_idea"
-            android:label="@string/idea"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <service
-            android:name=".ReportTile"
-            android:exported="true"
-            android:icon="@drawable/ic_report"
-            android:label="@string/report"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <service
-            android:name=".RecordTile"
-            android:exported="true"
-            android:icon="@drawable/ic_record"
-            android:label="@string/record"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
 
         <receiver
             android:name=".RetryReceiver"

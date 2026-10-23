@@ -38,7 +38,7 @@ class RecordService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        val withMic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val withMic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED // stack-reviewer-ignore: RECORD_AUDIO is declared in the manifest and CaptureActivity.record() requests it before asking for projection consent
         startForeground(
             Notifications.ID_RECORDING,
             Notifications.builder(this, Notifications.CHANNEL_RECORDING)

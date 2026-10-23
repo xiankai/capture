@@ -1,9 +1,11 @@
 package com.bespectacledcyborg.capture
 
+import android.Manifest
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -36,6 +38,7 @@ class RecordService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        val withMic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED // stack-reviewer-ignore: RECORD_AUDIO is declared in the manifest and CaptureActivity.record() requests it before asking for projection consent
         startForeground(
             Notifications.ID_RECORDING,
             Notifications.builder(this, Notifications.CHANNEL_RECORDING)
@@ -51,10 +54,14 @@ class RecordService : Service() {
                     ),
                 )
                 .build(),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
+            if (withMic) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            },
         )
         try {
-            begin(intent.getIntExtra(EXTRA_RESULT_CODE, 0), consent, pending)
+            begin(intent.getIntExtra(EXTRA_RESULT_CODE, 0), consent, pending, withMic)
         } catch (e: Exception) {
             release()
             CaptureStore(this).delete(pending)
@@ -64,14 +71,21 @@ class RecordService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun begin(resultCode: Int, consent: Intent, pending: PendingCapture) {
+    private fun begin(resultCode: Int, consent: Intent, pending: PendingCapture, withMic: Boolean) {
         val store = CaptureStore(this)
         val output = requireNotNull(store.mediaFile(pending))
         val screen = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
         val spec = VideoSpec.forDisplay(screen)
         val mediaRecorder = MediaRecorder(this).apply {
+            if (withMic) setAudioSource(MediaRecorder.AudioSource.MIC)
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            if (withMic) {
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioChannels(1)
+                setAudioSamplingRate(AUDIO_SAMPLE_RATE)
+                setAudioEncodingBitRate(AUDIO_BIT_RATE)
+            }
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             setVideoSize(spec.width, spec.height)
             setVideoFrameRate(spec.frameRate)
@@ -181,6 +195,8 @@ class RecordService : Service() {
         private const val EXTRA_RESULT_CODE = "resultCode"
         private const val EXTRA_CONSENT = "consent"
         private const val EXTRA_CAPTURE = "capture"
+        private const val AUDIO_SAMPLE_RATE = 44_100
+        private const val AUDIO_BIT_RATE = 96_000
         const val MAX_DURATION_MILLIS = 30_000L
 
         @Volatile

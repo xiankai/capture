@@ -3,14 +3,17 @@
 A small Android app for the Galaxy Tab S11: one tap captures what's on screen, a dictated
 note goes with it, and the homelab concierge files it as a triaged Forgejo issue.
 
+A floating button sits over every app. Drag it anywhere; it remembers where.
+
 | Trigger | Does |
 |---|---|
-| **Idea** | Dictation only |
-| **Report** | Screenshot of the app underneath (accessibility service), then dictation |
-| **Record** | Silent screen clip, up to 30 s. Tap the tile or the notification to stop, then dictation |
+| **Tap** → Report | Screenshot of the app underneath (the button hides for it), then dictation |
+| **Long-press** → Idea | Dictation only |
+| **Long-press** → Record | Silent screen clip, up to 30 s. The button turns blue; tap it or the notification to stop, then dictation |
+| **Long-press** → Hide | Removes the button until you open the app again |
 
-Each is a quick-settings tile, an app shortcut (long-press the icon in the taskbar) and a
-launcher entry of its own, because the One UI Edge panel only takes whole apps.
+The button is drawn by the accessibility service, so it needs no overlay permission and
+disappears when the service is off.
 
 Dictation uses Google's speech recognition in Singapore English (`en-SG`), falling back to
 the device language.
@@ -43,7 +46,5 @@ adb -s <tablet serial> install -r app/build/outputs/apk/debug/app-debug.apk
 
 Open **Capture**, then:
 
-- **Accessibility settings** → Installed apps → Capture → on. Report needs it; Idea and
-  Record still work without it, with the app recorded as `unknown`.
+- **Accessibility settings** → Installed apps → Capture → on. The floating button appears.
 - **Allow microphone and notifications.**
-- **Add Idea / Report / Record tile.**

@@ -2,7 +2,6 @@ package com.bespectacledcyborg.capture
 
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -16,7 +15,6 @@ import android.media.projection.MediaProjectionManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.service.quicksettings.TileService
 import android.view.Display
 import android.view.Surface
 import kotlinx.serialization.json.Json
@@ -106,7 +104,7 @@ class RecordService : Service() {
         mediaRecorder.start()
         handler.postDelayed(::finishInBackground, MAX_DURATION_MILLIS)
         current = this
-        refreshTile(this)
+        CaptureAccessibilityService.instance?.refreshBubble()
     }
 
     private fun finishInBackground() {
@@ -137,7 +135,7 @@ class RecordService : Service() {
         projection?.stop()
         projection = null
         if (current === this) current = null
-        refreshTile(this)
+        CaptureAccessibilityService.instance?.refreshBubble()
     }
 
     override fun onDestroy() {
@@ -196,10 +194,6 @@ class RecordService : Service() {
                     .putExtra(EXTRA_CONSENT, consent)
                     .putExtra(EXTRA_CAPTURE, Json.encodeToString(PendingCapture.serializer(), capture)),
             )
-        }
-
-        private fun refreshTile(context: Context) {
-            TileService.requestListeningState(context, ComponentName(context, RecordTile::class.java))
         }
     }
 }

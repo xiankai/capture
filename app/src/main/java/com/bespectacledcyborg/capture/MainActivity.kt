@@ -2,11 +2,8 @@ package com.bespectacledcyborg.capture
 
 import android.Manifest
 import android.app.Activity
-import android.app.StatusBarManager
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
@@ -38,15 +35,13 @@ class MainActivity : Activity() {
         column.addView(button("Allow microphone and notifications") {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1)
         })
-        column.addView(button("Add Idea tile") { addTile(IdeaTile::class.java, "Idea") })
-        column.addView(button("Add Report tile") { addTile(ReportTile::class.java, "Report") })
-        column.addView(button("Add Record tile") { addTile(RecordTile::class.java, "Record") })
         column.addView(button("Retry pending captures") { SendWorker.enqueue(this) })
         setContentView(ScrollView(this).apply { addView(column) })
     }
 
     override fun onResume() {
         super.onResume()
+        CaptureAccessibilityService.instance?.showBubble()
         refresh()
     }
 
@@ -65,21 +60,13 @@ class MainActivity : Activity() {
             status.text = listOf(
                 "Version ${BuildConfig.VERSION_NAME}",
                 "Accessibility service: ${onOff(accessibility)}",
+                "Floating button: ${if (accessibility) "on. Tap to report, long-press for Idea, Record or Hide" else "needs the accessibility service"}",
                 "Microphone: ${onOff(microphone)}",
                 "Notifications: ${onOff(notifications)}",
                 "Homelab: ${if (reachable) "reachable" else "not reachable. Not on home Wi-Fi and Tailscale off?"}",
                 "Waiting to send: $pending",
             ).joinToString("\n")
         }
-    }
-
-    private fun addTile(tile: Class<*>, label: String) {
-        getSystemService(StatusBarManager::class.java).requestAddTileService(
-            ComponentName(this, tile),
-            label,
-            Icon.createWithResource(this, R.drawable.ic_capture),
-            mainExecutor,
-        ) {}
     }
 
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {

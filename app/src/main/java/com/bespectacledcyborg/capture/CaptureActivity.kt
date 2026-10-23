@@ -5,12 +5,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
-import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -22,12 +20,9 @@ import android.widget.TextView
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 class CaptureActivity : Activity() {
@@ -59,31 +54,9 @@ class CaptureActivity : Activity() {
         }
         when (kindOf(intent)) {
             CaptureKind.IDEA -> dictate(started(CaptureKind.IDEA, foregroundApp()))
-            CaptureKind.REPORT -> report()
             CaptureKind.RECORD -> record()
-            null -> finish()
+            CaptureKind.REPORT, null -> finish()
         }
-    }
-
-    private suspend fun report() {
-        val service = CaptureAccessibilityService.instance
-        if (service == null) {
-            askForAccessibility()
-            return
-        }
-        delay(SHADE_SETTLE_MILLIS)
-        val pending = PendingCapture.start(CaptureKind.REPORT, service.foregroundApp())
-        val bitmap = service.screenshot()
-        if (bitmap == null) {
-            Toast.makeText(this, "Screenshot failed", Toast.LENGTH_LONG).show()
-            finish()
-            return
-        }
-        withContext(Dispatchers.IO) {
-            requireNotNull(store.mediaFile(pending)).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) } // stack-reviewer-ignore: a REPORT capture always has a jpg fileName, so mediaFile is non-null here
-            bitmap.recycle()
-        }
-        dictate(started(pending))
     }
 
     private suspend fun record() {
@@ -115,9 +88,8 @@ class CaptureActivity : Activity() {
     private fun foregroundApp(): AppContext =
         CaptureAccessibilityService.instance?.foregroundApp() ?: AppContext.UNKNOWN
 
-    private fun started(kind: CaptureKind, context: AppContext) = started(PendingCapture.start(kind, context))
-
-    private fun started(pending: PendingCapture): PendingCapture = pending.also(store::save)
+    private fun started(kind: CaptureKind, context: AppContext): PendingCapture =
+        PendingCapture.start(kind, context).also(store::save)
 
     private suspend fun dictate(pending: PendingCapture) {
         capture = pending
@@ -163,13 +135,6 @@ class CaptureActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PERMISSIONS) permissionsAnswered?.complete(Unit)
-    }
-
-    private fun askForAccessibility() {
-        Toast.makeText(this, "Turn on Capture in Accessibility settings first", Toast.LENGTH_LONG).show()
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        decided = true
-        finish()
     }
 
     private fun panel(pending: PendingCapture): FrameLayout {
@@ -240,7 +205,6 @@ class CaptureActivity : Activity() {
         private const val EXTRA_CAPTURE_ID = "captureId"
         private const val REQUEST_PERMISSIONS = 1
         private const val REQUEST_PROJECTION = 2
-        private const val SHADE_SETTLE_MILLIS = 600L
         private const val PERMISSION_TIMEOUT_MILLIS = 60_000L
 
         fun launchIntent(context: Context, kind: CaptureKind): Intent =
@@ -254,11 +218,7 @@ class CaptureActivity : Activity() {
                 .putExtra(EXTRA_CAPTURE_ID, captureId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        private fun kindOf(intent: Intent): CaptureKind? = CaptureKind.entries.firstOrNull {
-            intent.action == ACTION_PREFIX + it.name || intent.component?.className == launcherAlias(it)
-        }
-
-        private fun launcherAlias(kind: CaptureKind): String =
-            "com.bespectacledcyborg.capture.${kind.name.lowercase().replaceFirstChar(Char::uppercase)}Launcher"
+        private fun kindOf(intent: Intent): CaptureKind? =
+            CaptureKind.entries.firstOrNull { intent.action == ACTION_PREFIX + it.name }
     }
 }

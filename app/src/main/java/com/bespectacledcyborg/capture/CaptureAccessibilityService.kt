@@ -1,6 +1,11 @@
 package com.bespectacledcyborg.capture
 
 import android.accessibilityservice.AccessibilityService
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
@@ -22,14 +27,26 @@ class CaptureAccessibilityService : AccessibilityService() {
     private var reporting: Job? = null
     private var bubble: Bubble? = null
 
+    private val lockWatcher = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> bubble?.remove()
+                Intent.ACTION_USER_PRESENT -> if (BubblePrefs(context).wanted) bubble?.show()
+            }
+        }
+    }
+
     override fun onServiceConnected() {
         instance = this
         bubble = Bubble(this, onTap = ::onBubbleTap, onMenu = ::onBubbleMenu)
-        if (BubblePrefs(this).wanted) bubble?.show()
+        registerReceiver(lockWatcher, IntentFilter(Intent.ACTION_SCREEN_OFF).apply { addAction(Intent.ACTION_USER_PRESENT) })
+        val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        if (BubblePrefs(this).wanted && !locked) bubble?.show()
     }
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        if (bubble != null) unregisterReceiver(lockWatcher)
         bubble?.remove()
         scope.cancel()
         super.onDestroy()

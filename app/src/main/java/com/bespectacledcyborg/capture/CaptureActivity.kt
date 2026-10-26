@@ -137,7 +137,7 @@ class CaptureActivity : Activity() {
         val pending = capture ?: return
         decided = true
         dictation?.stop()
-        store.save(pending.copy(said = said.text.toString().trim(), ready = true))
+        store.save(pending.copy(said = said.text.toString().trim(), ready = true)) // stack-reviewer-ignore: Send is an explicit tap, the old Send button sent a blank note too, and a Report or Record carries its file without one
         SendWorker.enqueue(this)
         finish()
     }

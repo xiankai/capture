@@ -9,11 +9,14 @@ import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
+import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -34,8 +37,10 @@ class CaptureActivity : Activity() {
     private var permissionsAnswered: CompletableDeferred<Unit>? = null
     private var recordingCapture: PendingCapture? = null
 
+    private lateinit var root: FrameLayout
     private lateinit var status: TextView
-    private lateinit var said: TextView
+    private lateinit var said: EditText
+    private lateinit var talkButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,16 +104,40 @@ class CaptureActivity : Activity() {
         dictation = Dictation(
             this,
             onStatus = { status.text = it },
-            onText = { said.text = it },
-            onFinal = ::send,
-        ).also { it.start() }
+            onHeard = { status.text = it },
+            onSegment = ::appendSegment,
+            onListening = ::showListening,
+        )
+        talk()
     }
 
-    private fun send(text: String) {
+    private fun talk() {
+        root.requestFocus()
+        getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(said.windowToken, 0)
+        dictation?.start()
+    }
+
+    private fun stopTalking() {
+        val current = dictation ?: return
+        if (!current.listening) return
+        current.stop()
+        status.text = "Stopped. Edit if needed, then Send."
+    }
+
+    private fun appendSegment(segment: String) {
+        said.setText(Transcript.append(said.text, segment))
+        said.setSelection(said.length())
+    }
+
+    private fun showListening(listening: Boolean) {
+        talkButton.text = if (listening) "Stop" else "Talk"
+    }
+
+    private fun send() {
         val pending = capture ?: return
         decided = true
         dictation?.stop()
-        store.save(pending.copy(said = text.trim(), ready = true))
+        store.save(pending.copy(said = said.text.toString().trim(), ready = true)) // stack-reviewer-ignore: Send is an explicit tap, the old Send button sent a blank note too, and a Report or Record carries its file without one
         SendWorker.enqueue(this)
         finish()
     }
@@ -154,31 +183,37 @@ class CaptureActivity : Activity() {
         })
         status = TextView(this).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f) }
         card.addView(status)
-        said = TextView(this).apply {
+        said = EditText(this).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setPadding(0, dp(12), 0, dp(12))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            hint = "Speak, or tap here to type"
             minLines = 2
+            maxLines = 8
+            setOnFocusChangeListener { _, focused -> if (focused) stopTalking() }
         }
         card.addView(said)
+        talkButton = Button(this@CaptureActivity, null, android.R.attr.borderlessButtonStyle).apply {
+            text = "Talk"
+            setOnClickListener { if (dictation?.listening == true) stopTalking() else talk() }
+        }
         card.addView(LinearLayout(this).apply {
             gravity = Gravity.END
-            addView(Button(this@CaptureActivity, null, android.R.attr.borderlessButtonStyle).apply {
-                text = "Talk"
-                setOnClickListener { dictation?.start() }
-            })
+            addView(talkButton)
             addView(Button(this@CaptureActivity, null, android.R.attr.borderlessButtonStyle).apply {
                 text = "Cancel"
                 setOnClickListener { cancel() }
             })
             addView(Button(this@CaptureActivity, null, android.R.attr.borderlessButtonStyle).apply {
                 text = "Send"
-                setOnClickListener { send(said.text.toString()) }
+                setOnClickListener { send() }
             })
         })
-        return FrameLayout(this).apply {
+        root = FrameLayout(this).apply {
             setPadding(dp(16), dp(16), dp(16), dp(48))
+            isFocusableInTouchMode = true
             addView(card, FrameLayout.LayoutParams(minOf(dp(560), resources.displayMetrics.widthPixels - dp(32)), WRAP_CONTENT))
         }
+        return root
     }
 
     private fun themeColor(attr: Int): Int {

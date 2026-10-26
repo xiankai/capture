@@ -42,7 +42,8 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=""
-            android:theme="@style/Theme.Capture.Overlay" />
+            android:theme="@style/Theme.Capture.Overlay"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <service
             android:name=".CaptureAccessibilityService"

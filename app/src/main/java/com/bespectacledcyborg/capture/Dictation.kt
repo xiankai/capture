@@ -10,63 +10,100 @@ import android.speech.SpeechRecognizer
 class Dictation(
     private val context: Context,
     private val onStatus: (String) -> Unit,
-    private val onText: (String) -> Unit,
-    private val onFinal: (String) -> Unit,
+    private val onHeard: (String) -> Unit,
+    private val onSegment: (String) -> Unit,
+    private val onListening: (Boolean) -> Unit,
 ) {
     private var recognizer: SpeechRecognizer? = null
 
     private var language: String? = LANGUAGE
 
+    private var quietRounds = 0
+
+    val listening: Boolean
+        get() = recognizer != null
+
     fun start() {
-        stop()
+        release()
+        quietRounds = 0
         val created = SpeechRecognizer.createSpeechRecognizer(context)
         recognizer = created
         created.setRecognitionListener(listener)
-        val request = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_000L)
-        language?.let { request.putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
-        created.startListening(request)
-        onStatus(if (language == null) "Listening…" else "Listening ($language)…")
+        listen()
+        onListening(true)
     }
 
     fun stop() {
-        recognizer?.destroy()
+        if (!listening) return
+        release()
+        onListening(false)
+    }
+
+    private fun release() {
+        val current = recognizer ?: return
         recognizer = null
+        current.destroy()
+    }
+
+    private fun listen() {
+        val current = recognizer ?: return
+        val request = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        language?.let { request.putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
+        current.startListening(request)
+        onStatus(if (language == null) "Listening…" else "Listening ($language)…")
+    }
+
+    private fun listenAgainAfterSilence() {
+        quietRounds++
+        if (quietRounds < MAX_QUIET_ROUNDS) {
+            listen()
+            return
+        }
+        stop()
+        onStatus("Stopped after a long silence. Tap Talk to go on.")
     }
 
     private val listener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
+            if (!listening) return
             val text = best(results)
-            stop()
             if (text.isNullOrBlank()) {
-                onStatus("Didn't catch that. Tap Talk to try again.")
-            } else {
-                onText(text)
-                onFinal(text)
+                listenAgainAfterSilence()
+                return
             }
+            quietRounds = 0
+            onSegment(text)
+            listen()
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
-            best(partialResults)?.takeIf { it.isNotBlank() }?.let(onText)
+            if (!listening) return
+            val heard = best(partialResults)?.takeIf { it.isNotBlank() } ?: return
+            quietRounds = 0
+            onHeard(heard)
         }
 
         override fun onError(error: Int) {
-            stop()
-            if (language != null && error in UNSUPPORTED_LANGUAGE) {
-                language = null
-                start()
-                return
+            if (!listening) return
+            when {
+                error in SILENCE -> listenAgainAfterSilence()
+                language != null && error in UNSUPPORTED_LANGUAGE -> {
+                    language = null
+                    start()
+                }
+                else -> {
+                    stop()
+                    onStatus(
+                        if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                            "Microphone permission is off."
+                        } else {
+                            "Speech recognition error $error. Tap Talk to try again."
+                        },
+                    )
+                }
             }
-            onStatus(
-                when (error) {
-                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                        "Didn't catch that. Tap Talk to try again."
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is off."
-                    else -> "Speech recognition error $error. Tap Talk to try again."
-                },
-            )
         }
 
         override fun onEndOfSpeech() = onStatus("Working…")
@@ -82,6 +119,8 @@ class Dictation(
 
     private companion object {
         const val LANGUAGE = "en-SG"
+        const val MAX_QUIET_ROUNDS = 12
+        val SILENCE = setOf(SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
         val UNSUPPORTED_LANGUAGE = setOf(
             SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
             SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,

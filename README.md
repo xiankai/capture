@@ -16,7 +16,9 @@ The button is drawn by the accessibility service, so it needs no overlay permiss
 disappears when the service is off.
 
 Dictation uses Google's speech recognition in Singapore English (`en-SG`), falling back to
-the device language.
+the device language. It keeps listening through pauses until you tap **Stop**, appending
+each phrase to an editable field. Tap into the field to fix it by hand, **Talk** to carry on.
+Nothing is sent until you tap **Send**.
 
 ## Sending
 

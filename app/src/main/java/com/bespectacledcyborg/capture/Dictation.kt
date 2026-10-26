@@ -80,7 +80,9 @@ class Dictation(
 
         override fun onPartialResults(partialResults: Bundle?) {
             if (!listening) return
-            best(partialResults)?.takeIf { it.isNotBlank() }?.let(onHeard)
+            val heard = best(partialResults)?.takeIf { it.isNotBlank() } ?: return
+            quietRounds = 0
+            onHeard(heard)
         }
 
         override fun onError(error: Int) {

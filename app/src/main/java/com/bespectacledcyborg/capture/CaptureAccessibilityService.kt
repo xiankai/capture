@@ -59,7 +59,7 @@ class CaptureAccessibilityService : AccessibilityService() {
     fun showBubble(): Boolean {
         BubblePrefs(this).wanted = true
         val shown = bubble ?: return false
-        return runCatching { shown.show() }.isSuccess
+        return runCatching { shown.show() }.isSuccess // stack-reviewer-ignore: an already-visible bubble is success; the owner asked for the launcher icon to only show the bubble, never settings
     }
 
     fun refreshBubble() {

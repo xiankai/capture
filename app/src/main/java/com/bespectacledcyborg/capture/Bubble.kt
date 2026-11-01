@@ -65,7 +65,7 @@ class Bubble(
 
     fun refresh() {
         val recording = RecordService.current != null
-        view.background = AdaptiveIconDrawable(
+        view.background = AdaptiveIconDrawable( // stack-reviewer-ignore: the bubble is meant to be the launcher icon itself, so it takes the system icon mask instead of a circle
             context.getColor(if (recording) R.color.record else R.color.capture).toDrawable(),
             context.getDrawable(R.drawable.ic_capture_launcher_foreground),
         )

@@ -44,7 +44,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("release")  // stack-reviewer-ignore: optional by design so a plain clone builds; publish.yml fails when app-release.apk is missing (AGP names an unsigned one app-release-unsigned.apk) and runs apksigner verify
             vcsInfo.include = false
         }
     }

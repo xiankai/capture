@@ -59,7 +59,7 @@ class CaptureAccessibilityService : AccessibilityService() {
     fun showBubble(): Boolean {
         BubblePrefs(this).wanted = true
         val shown = bubble ?: return false
-        return runCatching { shown.show() }.isSuccess && shown.isShown
+        return runCatching { shown.show() }.isSuccess
     }
 
     fun refreshBubble() {
@@ -79,6 +79,7 @@ class CaptureAccessibilityService : AccessibilityService() {
         when (choice) {
             Bubble.Choice.IDEA -> startActivity(CaptureActivity.launchIntent(this, CaptureKind.IDEA))
             Bubble.Choice.RECORD -> startActivity(CaptureActivity.launchIntent(this, CaptureKind.RECORD))
+            Bubble.Choice.SETTINGS -> startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             Bubble.Choice.HIDE -> {
                 BubblePrefs(this).wanted = false
                 bubble?.remove()

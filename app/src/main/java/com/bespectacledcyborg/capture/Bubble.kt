@@ -22,7 +22,7 @@ class Bubble(
     private val onTap: () -> Unit,
     private val onMenu: (Choice) -> Unit,
 ) {
-    enum class Choice(val label: Int) { IDEA(R.string.idea), RECORD(R.string.record), HIDE(R.string.hide) }
+    enum class Choice(val label: Int) { IDEA(R.string.idea), RECORD(R.string.record), SETTINGS(R.string.settings_short), HIDE(R.string.hide) }
 
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private val prefs = BubblePrefs(context)

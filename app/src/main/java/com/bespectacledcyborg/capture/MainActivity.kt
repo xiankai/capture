@@ -79,7 +79,7 @@ class MainActivity : Activity() {
             status.text = listOf(
                 "Version ${BuildConfig.VERSION_NAME}",
                 "Accessibility service: ${onOff(accessibility)}",
-                "Floating button: ${if (accessibility) "on. Tap to report, long-press for Idea, Record or Hide" else "needs the accessibility service"}",
+                "Floating button: ${if (accessibility) "on. Tap to report, long-press for Idea, Record, Settings or Hide" else "needs the accessibility service"}",
                 "Microphone: ${onOff(microphone)}",
                 "Notifications: ${onOff(notifications)}",
                 "Homelab: ${if (reachable) "reachable" else "not reachable. Not on home Wi-Fi and Tailscale off?"}",

@@ -10,6 +10,7 @@ A floating button sits over every app. Drag it anywhere; it remembers where.
 | **Tap** → Report | Screenshot of the app underneath (the button hides for it), then dictation |
 | **Long-press** → Idea | Dictation only |
 | **Long-press** → Record | Screen clip with your voice from the mic, up to 30 s. The button turns blue; tap it or the notification to stop, then dictation |
+| **Long-press** → Settings | Opens the settings page |
 | **Long-press** → Hide | Removes the button until you tap the launcher icon again |
 
 The button is drawn by the accessibility service, so it needs no overlay permission and

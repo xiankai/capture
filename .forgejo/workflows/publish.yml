@@ -85,7 +85,7 @@ jobs:
           [ -n "$code" ] && [ -n "$name" ] || { echo "::error::could not read versionCode/versionName"; exit 1; }
           newest=$(curl -fsS -H "Authorization: token ${RUN_TOKEN}" "$API/releases?limit=50" \
             | jq -r '[.[].tag_name | select(test("^v[0-9]+$")) | ltrimstr("v") | tonumber] | max // 0')
-          if [ "$code" -lt "$newest" ]; then
+          if [ "$code" -lt "$newest" ]; then  # stack-reviewer-ignore: versionCode is the HEAD commit's timestamp, so an equal one is a re-run of the same commit and republishing it is intended
             echo "::error::versionCode $code is older than the newest release v$newest and would not install over it"
             exit 1
           fi
@@ -133,7 +133,7 @@ jobs:
             "$API/releases/${id}/assets?name=capture.apk" >/dev/null
           echo "released $tag ($VERSION_NAME)"
           curl -fsS -H "$auth" "$API/releases?limit=50" \
-            | jq -r 'sort_by(.id) | reverse | .[3:][] | "\(.id) \(.tag_name)"' \
+            | jq -r 'map(select(.tag_name | test("^v[0-9]+$"))) | sort_by(.tag_name | ltrimstr("v") | tonumber) | reverse | .[3:][] | "\(.id) \(.tag_name)"' \
             | while read -r old_id old_tag; do
                 echo "pruning $old_tag"
                 curl -fsS -X DELETE -H "$auth" "$API/releases/${old_id}"

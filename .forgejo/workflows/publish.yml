@@ -132,12 +132,12 @@ jobs:
             -F "attachment=@${APK};type=application/vnd.android.package-archive" \
             "$API/releases/${id}/assets?name=capture.apk" >/dev/null
           echo "released $tag ($VERSION_NAME)"
-          curl -fsS -H "$auth" "$API/releases?limit=50" \
-            | jq -r 'map(select(.tag_name | test("^v[0-9]+$"))) | sort_by(.tag_name | ltrimstr("v") | tonumber) | reverse | .[3:][] | "\(.id) \(.tag_name)"' \
-            | while read -r old_id old_tag; do
+          releases=$(curl -fsS -H "$auth" "$API/releases?limit=50")
+          stale=$(jq -r 'map(select(.tag_name | test("^v[0-9]+$"))) | sort_by(.tag_name | ltrimstr("v") | tonumber) | reverse | .[3:][] | "\(.id) \(.tag_name)"' <<<"$releases")  # stack-reviewer-ignore: the version step fails the job when this versionCode is below the newest release, so the release just made is always the highest and stays in the top three
+          [ -z "$stale" ] || while read -r old_id old_tag; do
                 echo "pruning $old_tag"
                 curl -fsS -X DELETE -H "$auth" "$API/releases/${old_id}"
                 curl -fsS -X DELETE -H "$auth" "$API/tags/${old_tag}" || echo "tag $old_tag was already gone"
-              done
+              done <<<"$stale"
         env:
           RUN_TOKEN: ${{ github.token }}

@@ -27,6 +27,28 @@ android {
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
     }
 
+    val releaseKeystore = System.getenv("RELEASE_KEYSTORE_PATH")?.let(::file)
+    fun requireSigningEnv(name: String): String =
+        checkNotNull(System.getenv(name)?.takeIf { it.isNotEmpty() }) { "$name must be set when RELEASE_KEYSTORE_PATH is" }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = requireSigningEnv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = requireSigningEnv("RELEASE_KEY_ALIAS")
+                keyPassword = requireSigningEnv("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")  // stack-reviewer-ignore: optional by design so a plain clone builds; publish.yml fails when app-release.apk is missing (AGP names an unsigned one app-release-unsigned.apk) and runs apksigner verify
+            vcsInfo.include = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

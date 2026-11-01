@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -15,6 +17,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
     private val scope = MainScope()
@@ -22,22 +25,38 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        status = TextView(this).apply {
+            textSize = 16f
+            setLineSpacing(dp(6).toFloat(), 1f)
+        }
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addButton("Accessibility settings") {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            addButton("Allow microphone and notifications") {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1)
+            }
+            addButton("Retry pending captures") { SendWorker.enqueue(this@MainActivity) }
+        }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val pad = (24 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad, pad, pad)
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            addView(status)
+            addView(buttons, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(24) })
         }
-        status = TextView(this).apply { textSize = 16f }
-        column.addView(status)
-        column.addView(button("Accessibility settings") {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        })
-        column.addView(button("Allow microphone and notifications") {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1)
-        })
-        column.addView(button("Retry pending captures") { SendWorker.enqueue(this) })
         setContentView(ScrollView(this).apply { addView(column) })
     }
+
+    private fun LinearLayout.addButton(label: String, onClick: () -> Unit) {
+        val button = Button(context).apply {
+            text = label
+            setOnClickListener { onClick() }
+        }
+        addView(button, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
 
     override fun onResume() {
         super.onResume()
@@ -67,11 +86,6 @@ class MainActivity : Activity() {
                 "Waiting to send: $pending",
             ).joinToString("\n")
         }
-    }
-
-    private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
-        text = label
-        setOnClickListener { onClick() }
     }
 
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED

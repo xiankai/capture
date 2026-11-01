@@ -10,10 +10,14 @@ A floating button sits over every app. Drag it anywhere; it remembers where.
 | **Tap** → Report | Screenshot of the app underneath (the button hides for it), then dictation |
 | **Long-press** → Idea | Dictation only |
 | **Long-press** → Record | Screen clip with your voice from the mic, up to 30 s. The button turns blue; tap it or the notification to stop, then dictation |
-| **Long-press** → Hide | Removes the button until you open the app again |
+| **Long-press** → Hide | Removes the button until you tap the launcher icon again |
 
 The button is drawn by the accessibility service, so it needs no overlay permission and
 disappears when the service is off.
+
+Tapping the **Capture** launcher icon only brings the floating button back; no screen opens.
+Long-press the launcher icon → **Settings** for the settings page. If the button can't be
+shown (the accessibility service is off), the launcher icon opens the settings page instead.
 
 Dictation uses Google's speech recognition in Singapore English (`en-SG`), falling back to
 the device language. It keeps listening through pauses until you tap **Stop**, appending

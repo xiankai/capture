@@ -2,7 +2,7 @@ package com.bespectacledcyborg.capture
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.ContextThemeWrapper
@@ -11,9 +11,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.ImageView
 import android.widget.PopupMenu
 import androidx.core.content.edit
+import androidx.core.graphics.drawable.toDrawable
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
@@ -28,11 +28,7 @@ class Bubble(
     private val prefs = BubblePrefs(context)
     private val handler = Handler(Looper.getMainLooper())
     private val size = (BUBBLE_DP * context.resources.displayMetrics.density).roundToInt()
-    private val background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
-    private val view = ImageView(context).apply {
-        setImageResource(R.drawable.ic_capture)
-        scaleType = ImageView.ScaleType.CENTER
-        background = this@Bubble.background
+    private val view = View(context).apply {
         elevation = size / 8f
         contentDescription = context.getString(R.string.report)
         setOnClickListener { onTap() }
@@ -69,7 +65,10 @@ class Bubble(
 
     fun refresh() {
         val recording = RecordService.current != null
-        background.setColor(context.getColor(if (recording) R.color.record else R.color.report))
+        view.background = AdaptiveIconDrawable(
+            context.getColor(if (recording) R.color.record else R.color.capture).toDrawable(),
+            context.getDrawable(R.drawable.ic_capture_launcher_foreground),
+        )
         view.contentDescription = context.getString(if (recording) R.string.stop_recording else R.string.report)
     }
 

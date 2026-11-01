@@ -56,9 +56,10 @@ class CaptureAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    fun showBubble() {
+    fun showBubble(): Boolean {
         BubblePrefs(this).wanted = true
-        bubble?.show()
+        val shown = bubble ?: return false
+        return runCatching { shown.show() }.isSuccess && shown.isShown
     }
 
     fun refreshBubble() {

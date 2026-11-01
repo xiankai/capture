@@ -50,8 +50,9 @@ In Obtainium: **Add app** → App source URL
 link, same as Remote Explorer) → **Add** → **Install**. Tailscale must be on when Obtainium
 checks.
 
-The release key is in the repo's Actions secrets (`RELEASE_KEYSTORE_BASE64`,
-`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). A debug build
+The release key is Remote Explorer's sideload key (alias `sideload`), held as the
+clockwork-princess org's Actions secrets `SIDELOAD_KEYSTORE_BASE64` and
+`SIDELOAD_KEYSTORE_PROPERTIES`, so every app in the org can sign with it. A debug build
 from `adb install` is signed with another key, so it has to be uninstalled before the
 release build will install, and the other way round.
 

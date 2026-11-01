@@ -60,16 +60,20 @@ jobs:
       - name: Build the signed release APK
         run: |
           set -euo pipefail
-          test -n "${KEYSTORE_B64}" || { echo "::error::the RELEASE_KEYSTORE_BASE64 secret is not set"; exit 1; }
+          test -n "${KEYSTORE_B64}" || { echo "::error::the SIDELOAD_KEYSTORE_BASE64 secret is not set"; exit 1; }
+          test -n "${KEYSTORE_PROPS}" || { echo "::error::the SIDELOAD_KEYSTORE_PROPERTIES secret is not set"; exit 1; }
+          property() { awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' <<<"$KEYSTORE_PROPS"; }
           export RELEASE_KEYSTORE_PATH=/tmp/capture-release.jks
+          RELEASE_KEYSTORE_PASSWORD=$(property storePassword)
+          RELEASE_KEY_ALIAS=$(property keyAlias)
+          RELEASE_KEY_PASSWORD=$(property keyPassword)
+          export RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RELEASE_KEYSTORE_PATH"
           cd /tmp/repo
           ./gradlew --no-daemon assembleRelease
         env:
-          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.SIDELOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PROPS: ${{ secrets.SIDELOAD_KEYSTORE_PROPERTIES }}
           GRADLE_OPTS: -Dorg.gradle.configuration-cache=false
 
       - name: Verify the signature and read the version

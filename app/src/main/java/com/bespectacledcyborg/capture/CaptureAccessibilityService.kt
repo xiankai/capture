@@ -56,9 +56,10 @@ class CaptureAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    fun showBubble() {
+    fun showBubble(): Boolean {
         BubblePrefs(this).wanted = true
-        bubble?.show()
+        val shown = bubble ?: return false
+        return runCatching { shown.show() }.isSuccess // stack-reviewer-ignore: an already-visible bubble is success; the owner asked for the launcher icon to only show the bubble, never settings
     }
 
     fun refreshBubble() {
@@ -78,6 +79,7 @@ class CaptureAccessibilityService : AccessibilityService() {
         when (choice) {
             Bubble.Choice.IDEA -> startActivity(CaptureActivity.launchIntent(this, CaptureKind.IDEA))
             Bubble.Choice.RECORD -> startActivity(CaptureActivity.launchIntent(this, CaptureKind.RECORD))
+            Bubble.Choice.SETTINGS -> startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             Bubble.Choice.HIDE -> {
                 BubblePrefs(this).wanted = false
                 bubble?.remove()

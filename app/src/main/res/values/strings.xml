@@ -6,5 +6,7 @@
     <string name="report">Report</string>
     <string name="record">Record</string>
     <string name="hide">Hide</string>
+    <string name="settings">Capture settings</string>
+    <string name="settings_short">Settings</string>
     <string name="stop_recording">Stop recording</string>
 </resources>

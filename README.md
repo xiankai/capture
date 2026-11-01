@@ -39,12 +39,21 @@ Nothing is sent until you tap **Send**.
 
 ## Setup on the tablet
 
-Install on the tablet only, since `installDebug` installs on every connected device:
+The tablet installs and updates Capture through Obtainium. Every merge to `main` builds a
+signed release APK (`.forgejo/workflows/publish.yml`), uploads it over the last one at
+`https://dufs.example.invalid/apps/capture.apk`, and records it as a Forgejo
+release (the latest three are kept). Obtainium reads the dufs URL rather than the releases,
+because this repo is private and Obtainium's Forgejo source has no token field.
 
-```sh
-./gradlew assembleDebug
-adb -s <tablet serial> install -r app/build/outputs/apk/debug/app-debug.apk
-```
+In Obtainium: **Add app** → App source URL
+`https://dufs.example.invalid/apps/capture.apk` (detected as a direct APK
+link, same as Remote Explorer) → **Add** → **Install**. Tailscale must be on when Obtainium
+checks.
+
+The release key is in the repo's Actions secrets (`RELEASE_KEYSTORE_BASE64`,
+`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). A debug build
+from `adb install` is signed with another key, so it has to be uninstalled before the
+release build will install, and the other way round.
 
 Open **Capture**, then:
 

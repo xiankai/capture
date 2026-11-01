@@ -1,0 +1,143 @@
+name: publish
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container:
+      image: android-ci:latest
+    timeout-minutes: 30
+    env:
+      API: https://forgejo.example.invalid/api/v1/repos/${{ github.repository }}
+      APK: /tmp/repo/app/build/outputs/apk/release/app-release.apk
+      ANDROID_HOME: /opt/android-sdk
+    steps:
+      - name: Checkout the commit, if it is on main
+        run: |
+          set -euo pipefail
+          test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: token ${RUN_TOKEN}"
+          git clone --quiet --no-tags --filter=blob:none --branch main \
+            "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo
+          cd /tmp/repo
+          git -c advice.detachedHead=false checkout --quiet "${GITHUB_SHA}"
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::${GITHUB_SHA} is not on main. Merge it first."
+            exit 1
+          }
+          echo "publishing ${GITHUB_SHA} ($(git log -1 --format=%s))"
+        env:
+          RUN_TOKEN: ${{ github.token }}
+
+      - name: Gradle cache key
+        id: key
+        run: |
+          set -euo pipefail
+          cd /tmp/repo
+          files=$(git ls-files 'gradle/libs.versions.toml' 'gradle/wrapper/gradle-wrapper.properties' '*.gradle.kts')
+          [ -n "$files" ] || { echo "::error::no Gradle files matched for the cache key"; exit 1; }
+          h=$(printf '%s\n' "$files" | xargs -d '\n' sha256sum | sha256sum | cut -c1-16)
+          echo "key=gradle-build-${h}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Gradle cache
+        uses: https://data.forgejo.org/actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.key.outputs.key }}
+          restore-keys: |
+            gradle-build-
+
+      - name: Build the signed release APK
+        run: |
+          set -euo pipefail
+          test -n "${KEYSTORE_B64}" || { echo "::error::the RELEASE_KEYSTORE_BASE64 secret is not set"; exit 1; }
+          export RELEASE_KEYSTORE_PATH=/tmp/capture-release.jks
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RELEASE_KEYSTORE_PATH"
+          cd /tmp/repo
+          ./gradlew --no-daemon assembleRelease
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GRADLE_OPTS: -Dorg.gradle.configuration-cache=false
+
+      - name: Verify the signature and read the version
+        run: |
+          set -euo pipefail
+          rm -f /tmp/capture-release.jks
+          [ -f "$APK" ] || { echo "::error::no signed APK; outputs were: $(ls "$(dirname "$APK")")"; exit 1; }
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$tools/apksigner" verify "$APK" || { echo "::error::apksigner did not verify the APK"; exit 1; }
+          badging=$("$tools/aapt2" dump badging "$APK")
+          code=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionCode=$/) { print $(i + 1); exit } }' <<<"$badging")
+          name=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionName=$/) { print $(i + 1); exit } }' <<<"$badging")
+          [ -n "$code" ] && [ -n "$name" ] || { echo "::error::could not read versionCode/versionName"; exit 1; }
+          newest=$(curl -fsS -H "Authorization: token ${RUN_TOKEN}" "$API/releases?limit=50" \
+            | jq -r '[.[].tag_name | select(test("^v[0-9]+$")) | ltrimstr("v") | tonumber] | max // 0')
+          if [ "$code" -lt "$newest" ]; then
+            echo "::error::versionCode $code is older than the newest release v$newest and would not install over it"
+            exit 1
+          fi
+          { echo "VERSION_CODE=${code}"; echo "VERSION_NAME=${name}"; } >> "$GITHUB_ENV"
+          echo "versionCode $code ($name), newest release v$newest"
+        env:
+          RUN_TOKEN: ${{ github.token }}
+
+      - name: Upload to dufs, replacing the previous copy
+        run: |
+          set -euo pipefail
+          staging="${DUFS_URL}.upload"
+          want=$(stat -c %s "$APK")
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -T "$APK" "$staging")
+          case "$code" in 2*) ;; *) echo "::error::dufs upload failed with HTTP $code"; exit 1 ;; esac
+          got=$(curl -sSI "$staging" | awk -F': ' 'tolower($1) == "content-length" { print $2 + 0 }')
+          [ "$got" = "$want" ] || { echo "::error::dufs holds $got bytes of a $want-byte APK; the live copy was left alone"; exit 1; }
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X MOVE -H "Destination: ${DUFS_URL}" -H 'Overwrite: T' "$staging")
+          case "$code" in 2*) echo "uploaded to $DUFS_URL ($want bytes)" ;; *) echo "::error::moving the upload into place failed with HTTP $code"; exit 1 ;; esac
+        env:
+          DUFS_URL: https://dufs.example.invalid/apps/capture.apk
+
+      - name: Publish a release, keeping the latest three
+        run: |
+          set -euo pipefail
+          cd /tmp/repo
+          auth="Authorization: token ${RUN_TOKEN}"
+          tag="v${VERSION_CODE}"
+          existing=$(curl -sS -o /dev/null -w '%{http_code}' -H "$auth" "$API/releases/tags/${tag}")
+          case "$existing" in
+            200)
+              curl -fsS -X DELETE -H "$auth" "$API/releases/tags/${tag}"
+              curl -sS -o /dev/null -X DELETE -H "$auth" "$API/tags/${tag}"
+              ;;
+            404) ;;
+            *) echo "::error::looking up release $tag returned HTTP $existing"; exit 1 ;;
+          esac
+          payload=$(jq -n --arg tag "$tag" --arg target "$GITHUB_SHA" --arg name "$VERSION_NAME" \
+                       --arg body "$(git log -1 --pretty='%s%n%n%H')" \
+                       '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, draft: false, prerelease: false}')
+          id=$(curl -fsS -X POST -H "$auth" -H 'Content-Type: application/json' --data "$payload" "$API/releases" | jq -r '.id')
+          [ -n "$id" ] && [ "$id" != "null" ] || { echo "::error::release creation returned no id"; exit 1; }
+          curl -fsS -X POST -H "$auth" \
+            -F "attachment=@${APK};type=application/vnd.android.package-archive" \
+            "$API/releases/${id}/assets?name=capture.apk" >/dev/null
+          echo "released $tag ($VERSION_NAME)"
+          curl -fsS -H "$auth" "$API/releases?limit=50" \
+            | jq -r 'sort_by(.id) | reverse | .[3:][] | "\(.id) \(.tag_name)"' \
+            | while read -r old_id old_tag; do
+                echo "pruning $old_tag"
+                curl -fsS -X DELETE -H "$auth" "$API/releases/${old_id}"
+                curl -fsS -X DELETE -H "$auth" "$API/tags/${old_tag}" || echo "tag $old_tag was already gone"
+              done
+        env:
+          RUN_TOKEN: ${{ github.token }}

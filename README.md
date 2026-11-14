@@ -63,5 +63,18 @@ release build will install, and the other way round.
 
 Open **Capture**, then:
 
-- **Accessibility settings** → Installed apps → Capture → on. The floating button appears.
+- **Accessibility settings** → Installed apps → Capture → on → **Allow**. The floating button
+  appears.
 - **Allow microphone and notifications.**
+
+## When the floating button is missing
+
+The settings page says which of these it is:
+
+- **Accessibility service: off.** Turn it on as above. Force-stopping Capture (App info ›
+  Force stop) also switches it off, so avoid that.
+- **On, but not running.** Android suspends every accessibility service while a UiAutomation
+  session runs, for example an agent reading the screen through the mobile MCP or
+  `adb shell uiautomator`. The button comes back by itself once that session ends. To end it,
+  find the session's `app_process` with `adb shell ps -A | grep app_process` and `kill` it.
+  Nothing on the tablet needs changing.

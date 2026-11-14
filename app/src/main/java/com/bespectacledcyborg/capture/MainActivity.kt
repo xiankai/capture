@@ -2,6 +2,7 @@ package com.bespectacledcyborg.capture
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -58,6 +59,25 @@ class MainActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(column) })
     }
 
+    private fun serviceComponent() = ComponentName(this, CaptureAccessibilityService::class.java)
+
+    private fun accessibilityState(): AccessibilityState {
+        if (CaptureAccessibilityService.instance != null) return AccessibilityState.RUNNING
+        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            .split(':')
+            .mapNotNull(ComponentName::unflattenFromString)
+        return if (serviceComponent() in enabled) AccessibilityState.HELD_OFF else AccessibilityState.OFF
+    }
+
+    private enum class AccessibilityState(val status: String, val bubble: String) {
+        RUNNING("on", "on. Tap to report, long-press for Idea, Record, Settings or Hide"),
+        HELD_OFF(
+            "on, but not running. Usually an automation tool is holding it off (an agent driving the tablet over adb)",
+            "back once the service runs again",
+        ),
+        OFF("off. Tap Accessibility settings › Installed apps › Capture › on", "needs the accessibility service"),
+    }
+
     private fun LinearLayout.addButton(label: String, onClick: () -> Unit) {
         val button = Button(context).apply {
             text = label
@@ -80,7 +100,7 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
-        val accessibility = CaptureAccessibilityService.instance != null
+        val accessibility = accessibilityState()
         val microphone = granted(Manifest.permission.RECORD_AUDIO)
         val notifications = granted(Manifest.permission.POST_NOTIFICATIONS)
         val pending = CaptureStore(this).ready().size
@@ -88,8 +108,8 @@ class MainActivity : Activity() {
             val reachable = withContext(Dispatchers.IO) { Homelab.isReachable() }
             status.text = listOf(
                 "Version ${BuildConfig.VERSION_NAME}",
-                "Accessibility service: ${onOff(accessibility)}",
-                "Floating button: ${if (accessibility) "on. Tap to report, long-press for Idea, Record, Settings or Hide" else "needs the accessibility service"}",
+                "Accessibility service: ${accessibility.status}",
+                "Floating button: ${accessibility.bubble}",
                 "Microphone: ${onOff(microphone)}",
                 "Notifications: ${onOff(notifications)}",
                 "Homelab: ${if (reachable) "reachable" else "not reachable. Not on home Wi-Fi and Tailscale off?"}",

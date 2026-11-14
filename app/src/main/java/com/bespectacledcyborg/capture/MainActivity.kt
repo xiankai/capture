@@ -72,8 +72,8 @@ class MainActivity : Activity() {
     private enum class AccessibilityState(val status: String, val bubble: String) {
         RUNNING("on", "on. Tap to report, long-press for Idea, Record, Settings or Hide"),
         HELD_OFF(
-            "on, but Android is holding it off while an automation tool runs (an agent driving the tablet over adb, or uiautomator)",
-            "back once that automation ends",
+            "on, but not running. Usually an automation tool is holding it off (an agent driving the tablet over adb)",
+            "back once the service runs again",
         ),
         OFF("off. Tap Accessibility settings › Installed apps › Capture › on", "needs the accessibility service"),
     }

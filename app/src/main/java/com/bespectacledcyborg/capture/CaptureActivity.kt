@@ -221,7 +221,7 @@ class CaptureActivity : Activity() {
 
     private fun liftAboveKeyboard(view: View, insets: WindowInsets) {
         val keyboard = if (insets.isVisible(WindowInsets.Type.ime())) {
-            windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.ime()).bottom
+            windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.ime()).bottom // stack-reviewer-ignore: currentWindowMetrics spans the task area, not this wrap-content window, so it gives the full IME height; the insets argument is clipped to the window and would only converge over several layout passes. On the emulator the window grew by exactly the 883 px IME.
         } else {
             0
         }

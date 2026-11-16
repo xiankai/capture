@@ -20,6 +20,7 @@ import kotlin.math.roundToInt
 class Bubble(
     private val context: Context,
     private val onTap: () -> Unit,
+    private val onMenuOpening: () -> Unit,
     private val onMenu: (Choice) -> Unit,
 ) {
     enum class Choice(val label: Int) { IDEA(R.string.idea), RECORD(R.string.record), SETTINGS(R.string.settings_short), HIDE(R.string.hide) }
@@ -82,6 +83,7 @@ class Bubble(
     }
 
     private fun showMenu() {
+        onMenuOpening()
         val themed = ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_DayNight)
         PopupMenu(themed, view).apply {
             Choice.entries.forEach { menu.add(0, it.ordinal, it.ordinal, it.label) }

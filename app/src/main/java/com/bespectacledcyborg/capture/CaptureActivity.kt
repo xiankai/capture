@@ -12,6 +12,8 @@ import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
+import android.view.WindowInsets
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
@@ -58,20 +60,20 @@ class CaptureActivity : Activity() {
             return
         }
         when (kindOf(intent)) {
-            CaptureKind.IDEA -> dictate(started(CaptureKind.IDEA, foregroundApp()))
-            CaptureKind.RECORD -> record()
+            CaptureKind.IDEA -> dictate(started(CaptureKind.IDEA, appUnder(intent)))
+            CaptureKind.RECORD -> record(intent)
             CaptureKind.REPORT, null -> finish()
         }
     }
 
-    private suspend fun record() {
+    private suspend fun record(intent: Intent) {
         val running = RecordService.current
         if (running != null) {
             val pending = running.finish()?.let(store::load)
             if (pending == null) finish() else dictate(pending)
             return
         }
-        recordingCapture = PendingCapture.start(CaptureKind.RECORD, foregroundApp())
+        recordingCapture = PendingCapture.start(CaptureKind.RECORD, appUnder(intent))
         if (!permissionPromptAnswered()) return
         startActivityForResult(
             getSystemService(MediaProjectionManager::class.java)
@@ -90,8 +92,8 @@ class CaptureActivity : Activity() {
         finish()
     }
 
-    private fun foregroundApp(): AppContext =
-        CaptureAccessibilityService.instance?.foregroundApp() ?: AppContext.UNKNOWN
+    private fun appUnder(intent: Intent): AppContext =
+        appFrom(intent) ?: CaptureAccessibilityService.instance?.foregroundApp() ?: AppContext.UNKNOWN
 
     private fun started(kind: CaptureKind, context: AppContext): PendingCapture =
         PendingCapture.start(kind, context).also(store::save)
@@ -211,9 +213,19 @@ class CaptureActivity : Activity() {
         root = FrameLayout(this).apply {
             setPadding(dp(16), dp(16), dp(16), dp(48))
             isFocusableInTouchMode = true
+            setOnApplyWindowInsetsListener { view, insets -> insets.also { liftAboveKeyboard(view, it) } }
             addView(card, FrameLayout.LayoutParams(minOf(dp(560), resources.displayMetrics.widthPixels - dp(32)), WRAP_CONTENT))
         }
         return root
+    }
+
+    private fun liftAboveKeyboard(view: View, insets: WindowInsets) {
+        val keyboard = if (insets.isVisible(WindowInsets.Type.ime())) {
+            windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.ime()).bottom // stack-reviewer-ignore: currentWindowMetrics spans the task area, not this wrap-content window, so it gives the full IME height; the insets argument is clipped to the window and would only converge over several layout passes. On the emulator the window grew by exactly the 883 px IME.
+        } else {
+            0
+        }
+        view.setPadding(dp(16), dp(16), dp(16), maxOf(dp(48), keyboard + dp(16)))
     }
 
     private fun themeColor(attr: Int): Int {
@@ -238,14 +250,29 @@ class CaptureActivity : Activity() {
         private const val ACTION_PREFIX = "com.bespectacledcyborg.capture.action."
         private const val ACTION_DICTATE = ACTION_PREFIX + "DICTATE"
         private const val EXTRA_CAPTURE_ID = "captureId"
+        private const val EXTRA_APP_LABEL = "appLabel"
+        private const val EXTRA_APP_PACKAGE = "appPackage"
+        private const val EXTRA_APP_URL = "appUrl"
         private const val REQUEST_PERMISSIONS = 1
         private const val REQUEST_PROJECTION = 2
         private const val PERMISSION_TIMEOUT_MILLIS = 60_000L
 
-        fun launchIntent(context: Context, kind: CaptureKind): Intent =
+        fun launchIntent(context: Context, kind: CaptureKind, app: AppContext? = null): Intent =
             Intent(context, CaptureActivity::class.java)
                 .setAction(ACTION_PREFIX + kind.name)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .apply {
+                    if (app == null) return@apply
+                    putExtra(EXTRA_APP_LABEL, app.label)
+                    putExtra(EXTRA_APP_PACKAGE, app.packageName)
+                    putExtra(EXTRA_APP_URL, app.url)
+                }
+
+        private fun appFrom(intent: Intent): AppContext? {
+            val label = intent.getStringExtra(EXTRA_APP_LABEL) ?: return null
+            val pkg = intent.getStringExtra(EXTRA_APP_PACKAGE) ?: return null
+            return AppContext(label, pkg, intent.getStringExtra(EXTRA_APP_URL))
+        }
 
         fun dictateIntent(context: Context, captureId: String): Intent =
             Intent(context, CaptureActivity::class.java)

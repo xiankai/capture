@@ -18,19 +18,24 @@ class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         store.pruneAbandoned()
         val queue = store.ready()
         if (queue.isEmpty()) return@withContext Result.success()
-        if (!Homelab.isReachable()) {
+        val orchestrator = OrchestratorSetting(applicationContext).url
+        if (orchestrator == null) {
+            Notifications.noOrchestrator(applicationContext)
+            return@withContext Result.success()
+        }
+        if (!Homelab.isReachable(orchestrator)) {
             Notifications.unreachable(applicationContext)
             return@withContext Result.success()
         }
-        val failures = queue.mapNotNull { capture -> send(store, capture).exceptionOrNull() }
+        val failures = queue.mapNotNull { capture -> send(orchestrator, store, capture).exceptionOrNull() }
         val sent = queue.size - failures.size
         if (sent > 0) Notifications.sent(applicationContext, sent)
         failures.firstOrNull()?.let { Notifications.failed(applicationContext, it.message ?: it.javaClass.simpleName) }
         Result.success()
     }
 
-    private fun send(store: CaptureStore, capture: PendingCapture): kotlin.Result<Unit> = runCatching {
-        Homelab.post(capture.payload().toLine(), store.mediaFile(capture))
+    private fun send(orchestrator: String, store: CaptureStore, capture: PendingCapture): kotlin.Result<Unit> = runCatching {
+        Homelab.post(orchestrator, capture.payload().toLine(), store.mediaFile(capture))
         store.delete(capture)
     }
 

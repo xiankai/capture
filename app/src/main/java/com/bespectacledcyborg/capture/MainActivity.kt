@@ -7,10 +7,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import android.view.WindowInsets
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -24,9 +26,11 @@ import kotlin.math.roundToInt
 class MainActivity : Activity() {
     private val scope = MainScope()
     private lateinit var status: TextView
+    private lateinit var orchestrator: OrchestratorSetting
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        orchestrator = OrchestratorSetting(this)
         status = TextView(this).apply {
             textSize = 16f
             setLineSpacing(dp(6).toFloat(), 1f)
@@ -41,6 +45,18 @@ class MainActivity : Activity() {
             }
             addButton("Retry pending captures") { SendWorker.enqueue(this@MainActivity) }
         }
+        val orchestratorField = EditText(this).apply {
+            hint = "https://orchestrator.example"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine()
+            setText(orchestrator.entered)
+        }
+        val orchestratorForm = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(this@MainActivity).apply { text = "Orchestrator URL" })
+            addView(orchestratorField, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addButton("Save orchestrator URL") { saveOrchestrator(orchestratorField) }
+        }
         val heading = TextView(this).apply {
             setText(R.string.settings)
             setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Large)
@@ -49,6 +65,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             addView(heading)
             addView(status, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(16) })
+            addView(orchestratorForm, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(24) })
             addView(buttons, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(24) })
         }
         column.setOnApplyWindowInsetsListener { view, insets ->
@@ -57,6 +74,17 @@ class MainActivity : Activity() {
             insets
         }
         setContentView(ScrollView(this).apply { addView(column) })
+    }
+
+    private fun saveOrchestrator(field: EditText) {
+        if (!orchestrator.save(field.text.toString())) {
+            field.error = "Enter an http or https address, like https://orchestrator.example"
+            return
+        }
+        field.error = null
+        field.setText(orchestrator.entered)
+        refresh()
+        SendWorker.enqueue(this)
     }
 
     private fun serviceComponent() = ComponentName(this, CaptureAccessibilityService::class.java)
@@ -105,17 +133,23 @@ class MainActivity : Activity() {
         val notifications = granted(Manifest.permission.POST_NOTIFICATIONS)
         val pending = CaptureStore(this).ready().size
         scope.launch {
-            val reachable = withContext(Dispatchers.IO) { Homelab.isReachable() }
+            val orchestratorStatus = orchestratorStatus()
             status.text = listOf(
                 "Version ${BuildConfig.VERSION_NAME}",
                 "Accessibility service: ${accessibility.status}",
                 "Floating button: ${accessibility.bubble}",
                 "Microphone: ${onOff(microphone)}",
                 "Notifications: ${onOff(notifications)}",
-                "Homelab: ${if (reachable) "reachable" else "not reachable. Not on home Wi-Fi and Tailscale off?"}",
+                "Orchestrator: $orchestratorStatus",
                 "Waiting to send: $pending",
             ).joinToString("\n")
         }
+    }
+
+    private suspend fun orchestratorStatus(): String {
+        val url = orchestrator.url ?: return "not set. Enter its URL below"
+        val reachable = withContext(Dispatchers.IO) { Homelab.isReachable(url) }
+        return if (reachable) "reachable" else "not reachable. Check the network or VPN"
     }
 
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED

@@ -35,8 +35,26 @@ object Notifications {
 
     fun unreachable(context: Context) = retryable(
         context,
-        "Homelab not reachable",
-        "Homelab not reachable. Not on home Wi-Fi and Tailscale off?",
+        "Orchestrator not reachable",
+        "Orchestrator not reachable. Check the network or VPN, then retry.",
+    )
+
+    fun noOrchestrator(context: Context) = notify(
+        context,
+        ID_RESULT,
+        builder(context, CHANNEL_RESULT)
+            .setContentTitle("No orchestrator set")
+            .setContentText("Captures are kept until you set the orchestrator URL. Tap to open settings.")
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    Intent(context, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .setAutoCancel(true)
+            .build(),
     )
 
     fun failed(context: Context, reason: String) = retryable(context, "Capture not sent", reason)

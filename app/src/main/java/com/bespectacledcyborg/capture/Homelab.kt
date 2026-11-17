@@ -10,13 +10,12 @@ import java.net.URI
 import java.util.Base64
 
 object Homelab {
-    const val ORCHESTRATOR = "https://agents.example.invalid"
     const val CONCIERGE = "concierge"
 
     private const val MAX_UPLOAD_BYTES = 50L * 1024 * 1024
 
-    fun isReachable(): Boolean = runCatching {
-        open("$ORCHESTRATOR/api/health", "GET", timeoutMillis = 4_000).run {
+    fun isReachable(orchestrator: String): Boolean = runCatching {
+        open("$orchestrator/api/health", "GET", timeoutMillis = 4_000).run {
             try {
                 responseCode == 200
             } finally {
@@ -25,9 +24,9 @@ object Homelab {
         }
     }.getOrDefault(false)
 
-    fun post(line: String, file: File?) {
+    fun post(orchestrator: String, line: String, file: File?) {
         if (file != null && file.length() > MAX_UPLOAD_BYTES) throw IOException(failure(413, ""))
-        val connection = open("$ORCHESTRATOR/api/sessions/$CONCIERGE/input", "POST", timeoutMillis = 120_000)
+        val connection = open("$orchestrator/api/sessions/$CONCIERGE/input", "POST", timeoutMillis = 120_000)
         try {
             connection.doOutput = true
             connection.setChunkedStreamingMode(64 * 1024)

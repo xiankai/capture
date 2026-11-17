@@ -9,6 +9,13 @@ val headCommitTime: Instant = providers.exec {
     ?.let(Instant::ofEpochSecond)
     ?: error("versionCode is the HEAD commit's timestamp, so the app builds only from a git checkout")
 
+val defaultOrchestrator: String = providers.environmentVariable("CAPTURE_ORCHESTRATOR").orElse("").get().trim()
+    .also { url ->
+        require(url.isEmpty() || Regex("""https?://[^\s"\\$]+""").matches(url)) {
+            "CAPTURE_ORCHESTRATOR must be empty or an http(s) URL with no spaces, quotes, backslashes or dollar signs"
+        }
+    }
+
 plugins {
     id("com.android.application")
     alias(libs.plugins.kotlin.serialization)
@@ -25,6 +32,7 @@ android {
         versionCode = headCommitTime.epochSecond.toInt()
         versionName = ZonedDateTime.ofInstant(headCommitTime, ZoneId.of("Asia/Tokyo"))
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        buildConfigField("String", "DEFAULT_ORCHESTRATOR", "\"$defaultOrchestrator\"")
     }
 
     val releaseKeystore = System.getenv("RELEASE_KEYSTORE_PATH")?.let(::file)

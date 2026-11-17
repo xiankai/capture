@@ -40,6 +40,7 @@ jobs:
           RELEASE_KEY_ALIAS=$(property keyAlias)
           RELEASE_KEY_PASSWORD=$(property keyPassword)
           export RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD
+          trap 'rm -f "$RELEASE_KEYSTORE_PATH"' EXIT
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RELEASE_KEYSTORE_PATH"
           ./gradlew assembleRelease
         env:
@@ -50,7 +51,6 @@ jobs:
       - name: Verify the signature and match the version to the tag
         run: |
           set -euo pipefail
-          rm -f "$KEYSTORE"
           [ -f "$APK" ] || { echo "::error::no signed APK; outputs were: $(ls "$(dirname "$APK")")"; exit 1; }
           tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$tools/apksigner" verify "$APK" || { echo "::error::apksigner did not verify the APK"; exit 1; }

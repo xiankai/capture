@@ -109,13 +109,13 @@ jobs:
               process.exit(1);
             }
             const { workflow_runs: runs } = await response.json();
-            return runs.sort((a, b) => b.run_attempt - a.run_attempt || b.id - a.id)[0];
+            return runs.sort((a, b) => b.id - a.id)[0];
           }
 
           let announced = false;
           for (;;) {
             const run = await newestRun();
-            if (!run && Date.now() - started > appearWithinMs) {
+            if (!run && Date.now() - started > appearWithinMs) { // stack-reviewer-ignore: runs every iteration; an empty list makes run undefined, so the 10-minute limit applies to it
               console.log(`::error::no GitHub ci run for ${SHA} after 10 minutes. Is the push mirror carrying this branch?`);
               process.exit(1);
             }

@@ -1,7 +1,8 @@
 # Capture
 
-A small Android app for the Galaxy Tab S11: one tap captures what's on screen, a dictated
-note goes with it, and the homelab concierge files it as a triaged Forgejo issue.
+A small Android app for tablets (built on a Galaxy Tab S11): one tap captures what's on
+screen, a dictated note goes with it, and an agent orchestrator's concierge files it as a
+triaged issue.
 
 A floating button sits over every app. Drag it anywhere; it remembers where.
 
@@ -27,45 +28,43 @@ Nothing is sent until you tap **Send**.
 
 ## Sending
 
-1. `GET https://agents.example.invalid/api/health`. If it fails, a
-   notification warns "Homelab not reachable. Not on home Wi-Fi and Tailscale off?" and the
-   capture stays on the device until **Retry**.
-2. `POST /api/sessions/concierge/input` with the line and, for Report and Record, the file:
+Capture sends to an agent orchestrator that runs a `concierge` session. Set its address on
+the settings page under **Orchestrator URL**. A build made with `CAPTURE_ORCHESTRATOR` set
+in the environment starts with that address filled in.
+
+1. `GET <orchestrator>/api/health`. If it fails, or no address is set, a notification says
+   so and the capture stays on the device until it can be sent.
+2. `POST <orchestrator>/api/sessions/concierge/input` with the line and, for Report and
+   Record, the file:
 
    ```
    {"text": "Capture: {\"kind\":\"idea|report|record\",\"app\":\"<label>\",\"package\":\"<pkg>\",\"url\":\"<url>|null\",\"said\":\"<dictated text>\",\"at\":\"<ISO time>\"}",
     "file": {"name": "<YYYYMMDD-HHMMSS>-<package>.<jpg|mp4>", "data": "<base64>"}}
    ```
 
-   The format is shared with the orchestrator concierge (xiankai-github/concierge#18,
-   xiankai-github/homelab-agent-orchestrator#310). Change it only together with those.
-   `CapturePayloadTest` pins the exact line and body. The orchestrator caps files at 50 MB,
-   which is why clips are capped at 8 Mbps.
+   The orchestrator's concierge parses this format, so change it only together with the
+   concierge. `CapturePayloadTest` pins the exact line and body. The orchestrator caps files
+   at 50 MB, which is why clips are capped at 8 Mbps.
+
+## Building
+
+`./gradlew assembleDebug` builds a debug APK. The version code is the HEAD commit's
+timestamp, so build from a git checkout.
+
+A signed release build reads its key from the environment: `RELEASE_KEYSTORE_PATH`,
+`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD`, then
+`./gradlew assembleRelease`. A debug build is signed with another key, so it has to be
+uninstalled before a release build will install, and the other way round.
 
 ## Setup on the tablet
-
-The tablet installs and updates Capture through Obtainium. Every merge to `main` builds a
-signed release APK (`.forgejo/workflows/publish.yml`), uploads it over the last one at
-`https://dufs.example.invalid/apps/capture.apk`, and records it as a Forgejo
-release (the latest three are kept). Obtainium reads the dufs URL rather than the releases,
-because this repo is private and Obtainium's Forgejo source has no token field.
-
-In Obtainium: **Add app** → App source URL
-`https://dufs.example.invalid/apps/capture.apk` (detected as a direct APK
-link, same as Remote Explorer) → **Add** → **Install**. Tailscale must be on when Obtainium
-checks.
-
-The release key is Remote Explorer's sideload key (alias `sideload`), held as the
-clockwork-princess org's Actions secrets `SIDELOAD_KEYSTORE_BASE64` and
-`SIDELOAD_KEYSTORE_PROPERTIES`, so every app in the org can sign with it. A debug build
-from `adb install` is signed with another key, so it has to be uninstalled before the
-release build will install, and the other way round.
 
 Open **Capture**, then:
 
 - **Accessibility settings** → Installed apps → Capture → on → **Allow**. The floating button
   appears.
 - **Allow microphone and notifications.**
+- **Orchestrator URL:** enter the orchestrator's address and tap **Save orchestrator URL**,
+  unless the build came with one.
 
 ## When the floating button is missing
 
@@ -74,7 +73,13 @@ The settings page says which of these it is:
 - **Accessibility service: off.** Turn it on as above. Force-stopping Capture (App info ›
   Force stop) also switches it off, so avoid that.
 - **On, but not running.** Android suspends every accessibility service while a UiAutomation
-  session runs, for example an agent reading the screen through the mobile MCP or
+  session runs, for example a UI test or an agent driving the tablet through
   `adb shell uiautomator`. The button comes back by itself once that session ends. To end it,
   find the session's `app_process` with `adb shell ps -A | grep app_process` and `kill` it.
   Nothing on the tablet needs changing.
+
+## License
+
+Capture is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version. See [LICENSE](LICENSE).

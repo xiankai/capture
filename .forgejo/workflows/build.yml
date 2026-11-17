@@ -99,6 +99,7 @@ jobs:
           const headers = { Authorization: `Bearer ${TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "capture-github-ci-relay" };
           const pollMs = 20_000;
           const appearWithinMs = 10 * 60_000;
+          const finishWithinMs = 45 * 60_000;
           const started = Date.now();
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -129,6 +130,10 @@ jobs:
                 process.exit(0);
               }
               console.log(`::error::GitHub ci ${run.conclusion}: ${run.html_url}`);
+              process.exit(1);
+            }
+            if (run && Date.now() - started > finishWithinMs) {
+              console.log(`::error::GitHub ci is still ${run.status} after 45 minutes: ${run.html_url}`);
               process.exit(1);
             }
             await sleep(pollMs);

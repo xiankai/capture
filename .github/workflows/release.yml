@@ -57,7 +57,7 @@ jobs:
           badging=$("$tools/aapt2" dump badging "$APK")
           code=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionCode=$/) { print $(i + 1); exit } }' <<<"$badging")
           name=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionName=$/) { print $(i + 1); exit } }' <<<"$badging")
-          [ "v${code}" = "$TAG" ] || { echo "::error::the APK's versionCode ${code} does not match tag ${TAG}"; exit 1; }
+          [ "v${code}" = "$TAG" ] || { echo "::error::the APK's versionCode ${code} does not match tag ${TAG}"; exit 1; }  # stack-reviewer-ignore: both sides are the committer date; the build reads git log %ct (committer, not %at author) and the tag job reads commit.committer.date, checked equal on fdd2975
           echo "VERSION_NAME=${name}" >> "$GITHUB_ENV"
 
       - name: Publish the GitHub release

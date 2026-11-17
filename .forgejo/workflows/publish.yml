@@ -10,7 +10,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  tag:
+    if: vars.ANDROID_CI_LOCAL != '1' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+    timeout-minutes: 5
+    steps:
+      - name: Tag the commit with its versionCode, for GitHub's release workflow
+        env:
+          API: https://forgejo.example.invalid/api/v1/repos/${{ github.repository }}
+          RUN_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          const { API, RUN_TOKEN, SHA } = process.env;
+          const headers = { Authorization: `token ${RUN_TOKEN}`, "Content-Type": "application/json" };
+          const fail = (message) => { console.log(`::error::${message}`); process.exit(1); };
+
+          const commit = await fetch(`${API}/git/commits/${SHA}`, { headers });
+          if (!commit.ok) fail(`reading commit ${SHA} returned HTTP ${commit.status}`);
+          const committed = (await commit.json()).commit.committer.date;
+          const tag = `v${Math.floor(Date.parse(committed) / 1000)}`;
+
+          const existing = await fetch(`${API}/tags/${tag}`, { headers });
+          if (existing.ok) {
+            console.log(`${tag} already exists`);
+            process.exit(0);
+          }
+          if (existing.status !== 404) fail(`looking up ${tag} returned HTTP ${existing.status}`);
+
+          const created = await fetch(`${API}/tags`, { method: "POST", headers, body: JSON.stringify({ tag_name: tag, target: SHA }) });
+          if (!created.ok) fail(`creating ${tag} returned HTTP ${created.status}: ${(await created.text()).slice(0, 200)}`);
+          console.log(`tagged ${SHA} as ${tag}; the push mirror carries it to GitHub, which builds the release`);
+          EOF
+
   publish:
+    if: vars.ANDROID_CI_LOCAL == '1'
     runs-on: ubuntu-latest
     container:
       image: android-ci:latest

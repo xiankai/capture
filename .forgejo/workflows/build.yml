@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   checks:
+    if: vars.ANDROID_CI_LOCAL == '1'
     runs-on: ubuntu-latest
     container:
       image: android-ci:latest
@@ -74,3 +75,62 @@ jobs:
         run: |
           report=/tmp/repo/app/build/reports/lint-results-debug.txt
           [ -f "$report" ] && tail -100 "$report" || echo "no lint report produced"
+
+  github-ci:
+    if: vars.ANDROID_CI_LOCAL != '1'
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+    timeout-minutes: 60
+    steps:
+      - name: Wait for the GitHub ci run on this commit
+        env:
+          GITHUB_REPO: clockwork-princess/capture
+          TOKEN: ${{ secrets.GITHUB_ACTIONS_READ_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          const { GITHUB_REPO, TOKEN, SHA } = process.env;
+          if (!TOKEN) {
+            console.log("::error::the GITHUB_ACTIONS_READ_TOKEN secret is not set");
+            process.exit(1);
+          }
+          const runsUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=5`;
+          const headers = { Authorization: `Bearer ${TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "capture-github-ci-relay" };
+          const pollMs = 20_000;
+          const appearWithinMs = 10 * 60_000;
+          const started = Date.now();
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          async function newestRun() {
+            const response = await fetch(runsUrl, { headers });
+            if (!response.ok) {
+              console.log(`::error::GitHub answered HTTP ${response.status} for ${GITHUB_REPO}'s runs: ${(await response.text()).slice(0, 200)}`);
+              process.exit(1);
+            }
+            const { workflow_runs: runs } = await response.json();
+            return runs.sort((a, b) => b.run_attempt - a.run_attempt || b.id - a.id)[0];
+          }
+
+          let announced = false;
+          for (;;) {
+            const run = await newestRun();
+            if (!run && Date.now() - started > appearWithinMs) {
+              console.log(`::error::no GitHub ci run for ${SHA} after 10 minutes. Is the push mirror carrying this branch?`);
+              process.exit(1);
+            }
+            if (run && !announced) {
+              console.log(`GitHub run: ${run.html_url}`);
+              announced = true;
+            }
+            if (run?.status === "completed") {
+              if (run.conclusion === "success") {
+                console.log(`passed on GitHub: ${run.html_url}`);
+                process.exit(0);
+              }
+              console.log(`::error::GitHub ci ${run.conclusion}: ${run.html_url}`);
+              process.exit(1);
+            }
+            await sleep(pollMs);
+          }
+          EOF

@@ -35,7 +35,9 @@ jobs:
 
           const existing = await fetch(`${API}/tags/${tag}`, { headers });
           if (existing.ok) {
-            console.log(`${tag} already exists`);
+            const taggedSha = (await existing.json()).commit.sha;
+            if (taggedSha !== SHA) fail(`${tag} already tags ${taggedSha}, not ${SHA}: two commits share a committer second, so this one gets no release`);
+            console.log(`${tag} already tags ${SHA}`);
             process.exit(0);
           }
           if (existing.status !== 404) fail(`looking up ${tag} returned HTTP ${existing.status}`);

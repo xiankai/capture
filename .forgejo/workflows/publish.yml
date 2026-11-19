@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Tag the commit with its versionCode, for GitHub's release workflow
         env:
-          API: https://forgejo.example.invalid/api/v1/repos/${{ github.repository }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
           RUN_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
         run: |
@@ -54,7 +54,7 @@ jobs:
       image: android-ci:latest
     timeout-minutes: 30
     env:
-      API: https://forgejo.example.invalid/api/v1/repos/${{ github.repository }}
+      API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
       APK: /tmp/repo/app/build/outputs/apk/release/app-release.apk
       ANDROID_HOME: /opt/android-sdk
     steps:
@@ -64,7 +64,7 @@ jobs:
           test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
           export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: token ${RUN_TOKEN}"
           git clone --quiet --no-tags --filter=blob:none --branch main \
-            "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" /tmp/repo
           cd /tmp/repo
           git -c advice.detachedHead=false checkout --quiet "${GITHUB_SHA}"
           git merge-base --is-ancestor HEAD origin/main || {
@@ -141,6 +141,7 @@ jobs:
       - name: Upload to dufs, replacing the previous copy
         run: |
           set -euo pipefail
+          test -n "${DUFS_URL}" || { echo "::error::the CAPTURE_DUFS_URL variable is not set"; exit 1; }
           staging="${DUFS_URL}.upload"
           want=$(stat -c %s "$APK")
           code=$(curl -sS -o /dev/null -w '%{http_code}' -T "$APK" "$staging")
@@ -150,7 +151,7 @@ jobs:
           code=$(curl -sS -o /dev/null -w '%{http_code}' -X MOVE -H "Destination: ${DUFS_URL}" -H 'Overwrite: T' "$staging")
           case "$code" in 2*) echo "uploaded to $DUFS_URL ($want bytes)" ;; *) echo "::error::moving the upload into place failed with HTTP $code"; exit 1 ;; esac
         env:
-          DUFS_URL: https://dufs.example.invalid/apps/capture.apk
+          DUFS_URL: ${{ vars.CAPTURE_DUFS_URL }}
 
       - name: Publish a release, keeping the latest three
         run: |

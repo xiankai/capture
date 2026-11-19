@@ -24,7 +24,7 @@ jobs:
           test -n "${RUN_TOKEN}" || { echo "::error::no ephemeral run token available to clone a private repo"; exit 1; }
           export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: token ${RUN_TOKEN}"
           git clone --quiet --no-tags --filter=blob:none \
-            "https://forgejo.example.invalid/${GITHUB_REPOSITORY}.git" /tmp/repo
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" /tmp/repo
           if [ -n "${PR_NUMBER}" ]; then
             git -C /tmp/repo fetch --quiet origin "refs/pull/${PR_NUMBER}/head:refs/heads/pr-head"
             git -C /tmp/repo -c advice.detachedHead=false checkout --quiet pr-head

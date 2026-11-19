@@ -44,7 +44,7 @@ jobs:
 
           const created = await fetch(`${API}/tags`, { method: "POST", headers, body: JSON.stringify({ tag_name: tag, target: SHA }) });
           if (!created.ok) fail(`creating ${tag} returned HTTP ${created.status}: ${(await created.text()).slice(0, 200)}`);
-          console.log(`tagged ${SHA} as ${tag}; the push mirror carries it to GitHub, which builds the release`);
+          console.log(`tagged ${SHA} as ${tag}; the push mirror carries it to GitHub, which builds the release`); // stack-reviewer-ignore: by design (issue #19): the mirror prunes GitHub-only refs, so tags must start here; sync_on_commit pushes the tag within seconds, and a failed mirror push is repaired by the homelab reconcile
           EOF
 
   publish:

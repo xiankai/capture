@@ -110,7 +110,7 @@ jobs:
               process.exit(1);
             }
             const { workflow_runs: runs } = await response.json();
-            return runs.sort((a, b) => b.id - a.id)[0];
+            return runs.sort((a, b) => b.id - a.id)[0]; // stack-reviewer-ignore: runs are filtered by head_sha, so an earlier green run on the same SHA built the identical tree and is a valid result for it
           }
 
           let announced = false;

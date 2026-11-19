@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    if: vars.ANDROID_CI_LOCAL == '1'
+    runs-on: android
     container:
       image: android-ci:latest
     timeout-minutes: 30
@@ -74,3 +75,75 @@ jobs:
         run: |
           report=/tmp/repo/app/build/reports/lint-results-debug.txt
           [ -f "$report" ] && tail -100 "$report" || echo "no lint report produced"
+
+  github-ci:
+    if: vars.ANDROID_CI_LOCAL != '1'
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+    timeout-minutes: 60
+    steps:
+      - name: Wait for the GitHub ci run on this commit
+        env:
+          GITHUB_REPO: xiankai/capture
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          const { GITHUB_REPO, SHA } = process.env;
+          const runsUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=5`;
+          const headers = { Accept: "application/vnd.github+json", "User-Agent": "capture-github-ci-relay" };
+          const pollMs = 120_000;
+          const appearWithinMs = 10 * 60_000;
+          const finishWithinMs = 45 * 60_000;
+          const started = Date.now();
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const fail = (message) => { console.log(`::error::${message}`); process.exit(1); };
+
+          function rateLimitResetMs(response) {
+            const limited = (response.status === 403 || response.status === 429) && response.headers.get("x-ratelimit-remaining") === "0";
+            if (!limited) return null;
+            const resetSeconds = Number(response.headers.get("x-ratelimit-reset")) || Date.now() / 1000 + 60;
+            return resetSeconds * 1000 + 5_000;
+          }
+
+          async function newestRun() {
+            for (;;) {
+              const response = await fetch(runsUrl, { headers });
+              if (response.ok) {
+                const { workflow_runs: runs } = await response.json();
+                return runs.sort((a, b) => b.id - a.id)[0]; // stack-reviewer-ignore: runs are filtered by head_sha, so an earlier green run on the same SHA built the identical tree and is a valid result for it
+              }
+              const resumeAt = rateLimitResetMs(response);
+              if (resumeAt === null) fail(`GitHub answered HTTP ${response.status} for ${GITHUB_REPO}'s runs (the relay reads them anonymously, so the repo must be public): ${(await response.text()).slice(0, 200)}`);
+              if (resumeAt - started > finishWithinMs) fail(`GitHub's anonymous rate limit lasts until ${new Date(resumeAt).toISOString()}, past this job's 45-minute limit`);
+              console.log(`GitHub rate limit reached; waiting until ${new Date(resumeAt).toISOString()}`);
+              await sleep(Math.max(resumeAt - Date.now(), 1_000));
+            }
+          }
+
+          let announced = false;
+          for (;;) {
+            const run = await newestRun();
+            if (!run && Date.now() - started > appearWithinMs) { // stack-reviewer-ignore: runs every iteration; an empty list makes run undefined, so the 10-minute limit applies to it
+              console.log(`::error::no GitHub ci run for ${SHA} after 10 minutes. Is the push mirror carrying this branch?`);
+              process.exit(1);
+            }
+            if (run && !announced) {
+              console.log(`GitHub run: ${run.html_url}`);
+              announced = true;
+            }
+            if (run?.status === "completed") {
+              if (run.conclusion === "success") {
+                console.log(`passed on GitHub: ${run.html_url}`);
+                process.exit(0);
+              }
+              console.log(`::error::GitHub ci ${run.conclusion}: ${run.html_url}`);
+              process.exit(1);
+            }
+            if (run && Date.now() - started > finishWithinMs) {
+              console.log(`::error::GitHub ci is still ${run.status} after 45 minutes: ${run.html_url}`);
+              process.exit(1);
+            }
+            await sleep(pollMs);
+          }
+          EOF

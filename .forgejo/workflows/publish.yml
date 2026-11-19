@@ -10,8 +10,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  tag:
+    if: vars.ANDROID_CI_LOCAL != '1' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+    timeout-minutes: 5
+    steps:
+      - name: Tag the commit with its versionCode, for GitHub's release workflow
+        env:
+          API: https://forgejo.example.invalid/api/v1/repos/${{ github.repository }}
+          RUN_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          const { API, RUN_TOKEN, SHA } = process.env;
+          const headers = { Authorization: `token ${RUN_TOKEN}`, "Content-Type": "application/json" };
+          const fail = (message) => { console.log(`::error::${message}`); process.exit(1); };
+
+          const commit = await fetch(`${API}/git/commits/${SHA}`, { headers });
+          if (!commit.ok) fail(`reading commit ${SHA} returned HTTP ${commit.status}`);
+          const committed = (await commit.json()).commit.committer.date;
+          const tag = `v${Math.floor(Date.parse(committed) / 1000)}`; // stack-reviewer-ignore: app/build.gradle.kts sets versionCode from git log -1 --format=%ct, the same committer timestamp, and release.yml fails the release if they ever differ
+
+          const existing = await fetch(`${API}/tags/${tag}`, { headers });
+          if (existing.ok) {
+            const taggedSha = (await existing.json()).commit.sha;
+            if (taggedSha !== SHA) fail(`${tag} already tags ${taggedSha}, not ${SHA}: two commits share a committer second, so this one gets no release`);
+            console.log(`${tag} already tags ${SHA}`);
+            process.exit(0);
+          }
+          if (existing.status !== 404) fail(`looking up ${tag} returned HTTP ${existing.status}`);
+
+          const created = await fetch(`${API}/tags`, { method: "POST", headers, body: JSON.stringify({ tag_name: tag, target: SHA }) });
+          if (!created.ok) fail(`creating ${tag} returned HTTP ${created.status}: ${(await created.text()).slice(0, 200)}`);
+          console.log(`tagged ${SHA} as ${tag}; the push mirror carries it to GitHub, which builds the release`); // stack-reviewer-ignore: by design (issue #19): the mirror prunes GitHub-only refs, so tags must start here; sync_on_commit pushes the tag within seconds, and a failed mirror push is repaired by the homelab reconcile
+          EOF
+
+  publish:
+    if: vars.ANDROID_CI_LOCAL == '1'
+    runs-on: android
     container:
       image: android-ci:latest
     timeout-minutes: 30

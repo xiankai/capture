@@ -30,7 +30,8 @@ Nothing is sent until you tap **Send**.
 
 Capture sends to an agent orchestrator that runs a `concierge` session. Set its address on
 the settings page under **Orchestrator URL**. A build made with `CAPTURE_ORCHESTRATOR` set
-in the environment starts with that address filled in.
+in the environment starts with that address filled in. The GitHub release APKs are built
+without it, so they ask for an address on first use.
 
 1. `GET <orchestrator>/api/health`. If it fails, or no address is set, a notification says
    so and the capture stays on the device until it can be sent.

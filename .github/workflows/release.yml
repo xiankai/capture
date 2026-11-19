@@ -30,7 +30,6 @@ jobs:
       - name: Build the signed release APK
         run: |
           set -euo pipefail
-          test -n "${CAPTURE_ORCHESTRATOR}" || { echo "::error::the CAPTURE_ORCHESTRATOR variable is not set, so the build would ship with no orchestrator"; exit 1; }
           test -n "${KEYSTORE_B64}" || { echo "::error::the SIDELOAD_KEYSTORE_BASE64 secret is not set"; exit 1; }
           test -n "${KEYSTORE_PROPS}" || { echo "::error::the SIDELOAD_KEYSTORE_PROPERTIES secret is not set"; exit 1; }
           property() { awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' <<<"$KEYSTORE_PROPS"; }
@@ -45,7 +44,6 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.SIDELOAD_KEYSTORE_BASE64 }}
           KEYSTORE_PROPS: ${{ secrets.SIDELOAD_KEYSTORE_PROPERTIES }}
-          CAPTURE_ORCHESTRATOR: ${{ vars.CAPTURE_ORCHESTRATOR }}
 
       - name: Verify the signature and match the version to the tag
         run: |

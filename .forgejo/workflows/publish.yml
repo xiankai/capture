@@ -47,7 +47,7 @@ jobs:
 
   publish:
     if: vars.ANDROID_CI_LOCAL == '1'
-    runs-on: ubuntu-latest
+    runs-on: android
     container:
       image: android-ci:latest
     timeout-minutes: 30

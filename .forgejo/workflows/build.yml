@@ -13,7 +13,7 @@ concurrency:
 jobs:
   checks:
     if: vars.ANDROID_CI_LOCAL == '1'
-    runs-on: ubuntu-latest
+    runs-on: android
     container:
       image: android-ci:latest
     timeout-minutes: 30
@@ -85,7 +85,7 @@ jobs:
     steps:
       - name: Wait for the GitHub ci run on this commit
         env:
-          GITHUB_REPO: clockwork-princess/capture
+          GITHUB_REPO: xiankai/capture
           TOKEN: ${{ secrets.GITHUB_ACTIONS_READ_TOKEN }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |

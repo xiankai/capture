@@ -53,7 +53,7 @@ jobs:
           [ -f "$APK" ] || { echo "::error::no signed APK; outputs were: $(ls "$(dirname "$APK")")"; exit 1; }
           tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$tools/apksigner" verify "$APK" || { echo "::error::apksigner did not verify the APK"; exit 1; }
-          badging=$("$tools/aapt2" dump badging "$APK")
+          badging=$("$tools/aapt2" dump badging "$APK")  # stack-reviewer-ignore: aapt2 has had dump badging since build-tools 29; build-tools 36's aapt2 prints the package: versionCode= line parsed below, and $tools is the newest build-tools on the runner
           code=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionCode=$/) { print $(i + 1); exit } }' <<<"$badging")
           name=$(awk -F"'" '/^package:/ { for (i = 1; i < NF; i++) if ($i ~ /versionName=$/) { print $(i + 1); exit } }' <<<"$badging")
           [ "v${code}" = "$TAG" ] || { echo "::error::the APK's versionCode ${code} does not match tag ${TAG}"; exit 1; }  # stack-reviewer-ignore: both sides are the committer date; the build reads git log %ct (committer, not %at author) and the tag job reads commit.committer.date, checked equal on fdd2975

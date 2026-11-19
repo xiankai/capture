@@ -47,6 +47,13 @@ without it, so they ask for an address on first use.
    concierge. `CapturePayloadTest` pins the exact line and body. The orchestrator caps files
    at 50 MB, which is why clips are capped at 8 Mbps.
 
+## Installing
+
+Each merge to `main` publishes a signed APK on the
+[GitHub releases page](https://github.com/xiankai/capture/releases). To keep it updated, add
+`https://github.com/xiankai/capture` as an app in [Obtainium](https://obtainium.imranr.dev/).
+Release builds ask for the orchestrator's address on first use.
+
 ## Building
 
 `./gradlew assembleDebug` builds a debug APK. The version code is the HEAD commit's

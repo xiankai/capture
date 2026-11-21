@@ -15,7 +15,7 @@ jobs:
     if: vars.ANDROID_CI_LOCAL == '1'
     runs-on: android
     container:
-      image: android-ci:latest
+      image: }
     timeout-minutes: 30
     steps:
       - name: Checkout

@@ -51,7 +51,7 @@ jobs:
     if: vars.ANDROID_CI_LOCAL == '1'
     runs-on: android
     container:
-      image: }
+      image: ${{ vars.ANDROID_CI_IMAGE }}
     timeout-minutes: 30
     env:
       API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}

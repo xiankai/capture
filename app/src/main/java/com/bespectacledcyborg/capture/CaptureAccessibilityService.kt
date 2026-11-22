@@ -60,7 +60,7 @@ class CaptureAccessibilityService : AccessibilityService() {
     fun showBubble(): Boolean {
         BubblePrefs(this).wanted = true
         val shown = bubble ?: return false
-        return runCatching { shown.show() }.isSuccess // stack-reviewer-ignore: an already-visible bubble is success; the owner asked for the launcher icon to only show the bubble, never settings
+        return runCatching { shown.show() }.isSuccess
     }
 
     fun refreshBubble() {
@@ -90,7 +90,7 @@ class CaptureAccessibilityService : AccessibilityService() {
 
     private suspend fun report() {
         val shown = bubble ?: return
-        val pending = PendingCapture.start(CaptureKind.REPORT, foregroundApp()) // stack-reviewer-ignore: start only builds the object; nothing is stored until store.save after the screenshot succeeds
+        val pending = PendingCapture.start(CaptureKind.REPORT, foregroundApp())
         val bitmap = shown.hiddenWhile {
             delay(HIDE_SETTLE_MILLIS)
             screenshot()
@@ -101,7 +101,7 @@ class CaptureAccessibilityService : AccessibilityService() {
         }
         val store = CaptureStore(this)
         withContext(Dispatchers.IO) {
-            requireNotNull(store.mediaFile(pending)).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) } // stack-reviewer-ignore: a REPORT capture always has a jpg fileName, so mediaFile is non-null here
+            requireNotNull(store.mediaFile(pending)).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
             bitmap.recycle()
             store.save(pending)
         }

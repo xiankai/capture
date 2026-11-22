@@ -88,7 +88,7 @@ class CaptureActivity : Activity() {
         if (requestCode == REQUEST_PROJECTION && resultCode == RESULT_OK && data != null && pending != null) {
             RecordService.start(this, resultCode, data, pending)
         }
-        decided = true // stack-reviewer-ignore: a cancelled projection never saved recordingCapture, so the finishing activity has nothing to delete
+        decided = true
         finish()
     }
 
@@ -139,7 +139,7 @@ class CaptureActivity : Activity() {
         val pending = capture ?: return
         decided = true
         dictation?.stop()
-        store.save(pending.copy(said = said.text.toString().trim(), ready = true)) // stack-reviewer-ignore: Send is an explicit tap, the old Send button sent a blank note too, and a Report or Record carries its file without one
+        store.save(pending.copy(said = said.text.toString().trim(), ready = true))
         SendWorker.enqueue(this)
         finish()
     }
@@ -157,7 +157,7 @@ class CaptureActivity : Activity() {
         val answered = CompletableDeferred<Unit>()
         permissionsAnswered = answered
         requestPermissions(missing.toTypedArray(), REQUEST_PERMISSIONS)
-        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } != null) return true // stack-reviewer-ignore: a denial still opens the panel on purpose; Dictation shows "Microphone permission is off."
+        if (withTimeoutOrNull(PERMISSION_TIMEOUT_MILLIS) { answered.await() } != null) return true
         Toast.makeText(this, "Waiting for permissions -- capture cancelled", Toast.LENGTH_LONG).show()
         finish()
         return false
@@ -221,7 +221,7 @@ class CaptureActivity : Activity() {
 
     private fun liftAboveKeyboard(view: View, insets: WindowInsets) {
         val keyboard = if (insets.isVisible(WindowInsets.Type.ime())) {
-            windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.ime()).bottom // stack-reviewer-ignore: currentWindowMetrics spans the task area, not this wrap-content window, so it gives the full IME height; the insets argument is clipped to the window and would only converge over several layout passes. On the emulator the window grew by exactly the 883 px IME.
+            windowManager.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.ime()).bottom
         } else {
             0
         }
@@ -239,7 +239,7 @@ class CaptureActivity : Activity() {
     override fun onDestroy() {
         dictation?.stop()
         scope.cancel()
-        if (isFinishing && !decided) capture?.let(store::delete) // stack-reviewer-ignore: a process killed before onDestroy leaves the capture unready, and SendWorker's pruneAbandoned removes it
+        if (isFinishing && !decided) capture?.let(store::delete)
         super.onDestroy()
     }
 

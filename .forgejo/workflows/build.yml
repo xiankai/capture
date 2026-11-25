@@ -80,7 +80,7 @@ jobs:
     if: vars.ANDROID_CI_LOCAL != '1'
     runs-on: ubuntu-latest
     container:
-      image: node:22-bookworm
+      image: node:26-bookworm
     timeout-minutes: 60
     steps:
       - name: Wait for the GitHub ci run on this commit

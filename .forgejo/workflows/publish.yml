@@ -14,7 +14,7 @@ jobs:
     if: vars.ANDROID_CI_LOCAL != '1' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     container:
-      image: node:22-bookworm
+      image: node:26-bookworm
     timeout-minutes: 5
     steps:
       - name: Tag the commit with its versionCode, for GitHub's release workflow

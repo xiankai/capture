@@ -2,7 +2,7 @@
 coreKtx = "1.19.1"
 junit = "4.13.2"
 kotlin = "2.4.21"
-kotlinJson = "1.11.0"
+kotlinJson = "1.13.0"
 kotlinxCoroutinesAndroid = "1.11.0"
 workRuntimeKtx = "2.12.0"
 

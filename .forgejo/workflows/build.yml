@@ -78,7 +78,7 @@ jobs:
 
   github-ci:
     if: vars.ANDROID_CI_LOCAL != '1'
-    runs-on: ubuntu-latest
+    runs-on: relay
     container:
       image: node:26-bookworm
     timeout-minutes: 60
